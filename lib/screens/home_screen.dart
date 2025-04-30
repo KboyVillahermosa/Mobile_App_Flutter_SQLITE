@@ -13,9 +13,9 @@ class AppColors {
 
 class HomeScreen extends StatefulWidget {
   final String? phoneNumber; // Make it nullable with ?
-  
+
   const HomeScreen({
-    super.key, 
+    super.key,
     this.phoneNumber, // Make it optional
   });
 
@@ -27,11 +27,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
   void _onItemTapped(int index) {
+    // Always update the selected index first for visual feedback
     setState(() {
       _selectedIndex = index;
     });
-    
-    // Handle navigation to profile screen
+
+    // For profile tab, navigate to the profile screen
     if (index == 3 && widget.phoneNumber != null) {
       Navigator.push(
         context,
@@ -40,8 +41,215 @@ class _HomeScreenState extends State<HomeScreen> {
             phoneNumber: widget.phoneNumber!,
           ),
         ),
-      );
+      ).then((_) {
+        // When returning from profile, reset to home tab
+        setState(() {
+          _selectedIndex = 0;
+        });
+      });
     }
+  }
+
+  // Get the appropriate body widget based on selected tab
+  Widget _getBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return _buildHomeTab();
+      case 1:
+        return _buildSearchTab();
+      case 2:
+        return _buildNotificationsTab();
+      case 3:
+        // For index 3, we navigate to profile screen, but still need a body
+        return _buildProfilePreview();
+      default:
+        return _buildHomeTab();
+    }
+  }
+
+  Widget _buildHomeTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryColor.withOpacity(0.2),
+                  blurRadius: 15,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.check_circle_outline,
+              color: AppColors.primaryColor,
+              size: 70,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Successfully logged in!',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Welcome to Servebisyo',
+            style: TextStyle(fontSize: 18),
+          ),
+          if (widget.phoneNumber != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'Phone: ${widget.phoneNumber}',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textColor.withOpacity(0.7),
+                ),
+              ),
+            ),
+          const SizedBox(height: 48),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.textColor,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search,
+            size: 80,
+            color: AppColors.secondaryColor,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Search',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Text(
+              'Find services and providers in your area',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.textColor.withOpacity(0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotificationsTab() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.notifications,
+            size: 80,
+            color: AppColors.secondaryColor,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Notifications',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Text(
+              'You have no new notifications',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.textColor.withOpacity(0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfilePreview() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.person,
+            size: 80,
+            color: AppColors.secondaryColor,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Profile',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textColor,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Text(
+              widget.phoneNumber != null
+                  ? 'Loading your profile details...'
+                  : 'Please log in to view your profile',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: AppColors.textColor.withOpacity(0.7),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -69,79 +277,9 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           // Background pattern
           const PatternBackground(),
-          
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryColor.withOpacity(0.2),
-                        blurRadius: 15,
-                        spreadRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.check_circle_outline,
-                    color: AppColors.primaryColor,
-                    size: 70,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Successfully logged in!',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Welcome to Servebisyo',
-                  style: TextStyle(fontSize: 18),
-                ),
-                if (widget.phoneNumber != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8.0),
-                    child: Text(
-                      'Phone: ${widget.phoneNumber}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textColor.withOpacity(0.7),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 48),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (context) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  },
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Logout'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.textColor,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24, 
-                      vertical: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                ),
-              ],
-            ),
-          ),
+
+          // Dynamic content based on selected tab
+          _getBody(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -198,7 +336,7 @@ class PatternBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    
+
     return SizedBox(
       width: size.width,
       height: size.height,
