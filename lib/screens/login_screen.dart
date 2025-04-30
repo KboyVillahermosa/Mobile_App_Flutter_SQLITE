@@ -151,7 +151,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 32),
                       Text(
-                        'ServeBisyo',
+                        'Welcome Back',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
