@@ -1,6 +1,10 @@
+import 'dart:io'; // Add this import at the top
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'user_profile_screen.dart';
+import 'job_posting_screen.dart'; // Add this import
+import '../helpers/database_helper.dart'; // Add this import
+import '../models/job.dart'; // Add this import
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -12,11 +16,11 @@ class AppColors {
 }
 
 class HomeScreen extends StatefulWidget {
-  final String? phoneNumber; // Make it nullable with ?
+  final String? phoneNumber;
 
   const HomeScreen({
     super.key,
-    this.phoneNumber, // Make it optional
+    this.phoneNumber,
   });
 
   @override
@@ -25,6 +29,42 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  List<Job> _jobs = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadJobs();
+  }
+
+  // Load jobs from database
+  Future<void> _loadJobs() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    try {
+      final dbHelper = DatabaseHelper();
+      final jobs = await dbHelper.getAllJobs();
+      
+      if (mounted) {
+        setState(() {
+          _jobs = jobs;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading jobs: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   void _onItemTapped(int index) {
     // Always update the selected index first for visual feedback
@@ -68,78 +108,291 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeTab() {
-    return Center(
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (_jobs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primaryColor.withOpacity(0.2),
+                    blurRadius: 15,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.work_outline,
+                color: AppColors.primaryColor,
+                size: 70,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No jobs available yet',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Be the first to post a job!',
+              style: TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => _navigateToJobPosting(),
+              icon: const Icon(Icons.add),
+              label: const Text('Post a Job'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadJobs,
+      color: AppColors.primaryColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _jobs.length,
+        itemBuilder: (context, index) {
+          final job = _jobs[index];
+          return _buildJobCard(job);
+        },
+      ),
+    );
+  }
+
+  Widget _buildJobCard(Job job) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryColor.withOpacity(0.2),
-                  blurRadius: 15,
-                  spreadRadius: 5,
+          // Job images (if available)
+          if (job.imagePaths.isNotEmpty)
+            SizedBox(
+              height: 150,
+              child: PageView.builder(
+                itemCount: job.imagePaths.length,
+                itemBuilder: (context, index) {
+                  return Image.file(
+                    File(job.imagePaths[index]),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey[300],
+                        child: const Icon(Icons.broken_image, size: 50),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Job title
+                Text(
+                  job.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                
+                // Budget
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.attach_money,
+                      size: 16,
+                      color: AppColors.primaryColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '\$${job.budget.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textColor.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                
+                // Location
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 16,
+                      color: AppColors.secondaryColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      job.location,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textColor.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                
+                // Date/Time
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.calendar_today,
+                      size: 16,
+                      color: AppColors.secondaryColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatDateTime(job.dateTime),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textColor.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 12),
+                // Description (truncated)
+                Text(
+                  job.description.length > 100
+                      ? '${job.description.substring(0, 100)}...'
+                      : job.description,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textColor.withOpacity(0.8),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                // Apply button
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () => _applyForJob(job),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.secondaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: const Text('Apply'),
+                    ),
+                  ],
                 ),
               ],
-            ),
-            child: Icon(
-              Icons.check_circle_outline,
-              color: AppColors.primaryColor,
-              size: 70,
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Successfully logged in!',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Welcome to Servebisyo',
-            style: TextStyle(fontSize: 18),
-          ),
-          if (widget.phoneNumber != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text(
-                'Phone: ${widget.phoneNumber}',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: AppColors.textColor.withOpacity(0.7),
-                ),
-              ),
-            ),
-          const SizedBox(height: 48),
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-                (route) => false,
-              );
-            },
-            icon: const Icon(Icons.logout),
-            label: const Text('Logout'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.textColor,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              elevation: 2,
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    // Format the date and time in a user-friendly way
+    final date = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+    final time = '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    return '$date at $time';
+  }
+
+  void _applyForJob(Job job) {
+    // Show a dialog to confirm application
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Apply for Job'),
+        content: Text('Would you like to apply for "${job.title}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Here you would implement the actual job application logic
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Application submitted successfully!'),
+                  backgroundColor: AppColors.primaryColor,
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+            ),
+            child: const Text('Apply'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _navigateToJobPosting() {
+    if (widget.phoneNumber == null) {
+      // User must be logged in to post jobs
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to post a job'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobPostingScreen(
+          phoneNumber: widget.phoneNumber!,
+        ),
+      ),
+    ).then((posted) {
+      // Reload jobs when returning from job posting screen
+      if (posted == true) {
+        _loadJobs();
+      }
+    });
   }
 
   Widget _buildSearchTab() {
@@ -282,6 +535,14 @@ class _HomeScreenState extends State<HomeScreen> {
           _getBody(),
         ],
       ),
+      // Add floating action button for job posting
+      floatingActionButton: _selectedIndex == 0 
+          ? FloatingActionButton(
+              onPressed: _navigateToJobPosting,
+              backgroundColor: AppColors.primaryColor,
+              child: const Icon(Icons.add),
+            )
+          : null,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -329,7 +590,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// Pattern background class remains the same
 class PatternBackground extends StatelessWidget {
   const PatternBackground({super.key});
 
