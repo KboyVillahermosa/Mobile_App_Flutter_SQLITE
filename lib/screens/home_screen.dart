@@ -30,8 +30,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   List<Job> _jobs = [];
+  Map<int, String> _jobUserNames = {}; // Add this map to store job ID -> username
   bool _isLoading = true;
-  String _userName = ''; // Add this to store user's name
+  String _userName = '';
 
   @override
   void initState() {
@@ -89,17 +90,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final dbHelper = DatabaseHelper();
-      final jobs = await dbHelper.getAllJobs();
+      final jobsData = await dbHelper.getJobsWithUserInfo();
       
-      print('Loaded ${jobs.length} jobs from database'); // Add logging
+      print('Loaded ${jobsData.length} jobs from database'); // Add logging
       
-      // Debug log each job
-      for (final job in jobs) {
-        print('Job: ${job.id} - ${job.title} - ${job.status}');
+      List<Job> jobs = [];
+      Map<int, String> jobUserNames = {}; // Map to store job ID -> user name
+      
+      // Convert to Job objects and store user names
+      for (final jobData in jobsData) {
+        final job = Job.fromMap(jobData);
+        jobs.add(job);
+        
+        // Store user name for this job
+        if (jobData.containsKey('fullName')) {
+          jobUserNames[job.id!] = jobData['fullName'];
+        }
+        
+        print('Job: ${job.id} - ${job.title} - ${jobData['fullName']}');
       }
 
       setState(() {
         _jobs = jobs;
+        _jobUserNames = jobUserNames; // Store in class field
         _isLoading = false;
       });
     } catch (e) {
@@ -314,6 +327,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final formattedDate = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     final formattedTime =
         '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+        
+    // Get the user name for this job
+    final posterName = _jobUserNames[job.id] ?? 'Unknown User';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -327,8 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
           // If the job has images, show the first one
           if (job.imagePaths.isNotEmpty)
             ClipRRect(
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
               child: Image.file(
                 File(job.imagePaths.first),
                 height: 150,
@@ -354,6 +369,28 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Add the poster's name at the top
+                Row(
+                  children: [
+                    Icon(
+                      Icons.person,
+                      size: 16,
+                      color: AppColors.secondaryColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Posted by: $posterName',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textColor.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 8),
+                
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

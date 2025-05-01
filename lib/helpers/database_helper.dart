@@ -218,4 +218,18 @@ class DatabaseHelper {
       whereArgs: [id],
     );
   }
+
+  Future<List<Map<String, dynamic>>> getJobsWithUserInfo() async {
+    Database db = await database;
+    
+    // Join users and jobs tables to get user name with each job
+    final List<Map<String, dynamic>> jobsWithUserInfo = await db.rawQuery('''
+      SELECT jobs.*, users.fullName 
+      FROM jobs 
+      INNER JOIN users ON jobs.userId = users.id 
+      ORDER BY jobs.dateTime DESC
+    ''');
+    
+    return jobsWithUserInfo;
+  }
 }
