@@ -5,6 +5,7 @@ import 'user_profile_screen.dart';
 import 'job_posting_screen.dart'; // Add this import
 import '../helpers/database_helper.dart'; // Add this import
 import '../models/job.dart'; // Add this import
+import '../models/job_application.dart'; // Add this import
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -31,11 +32,13 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   List<Job> _jobs = [];
   bool _isLoading = false;
+  int _unreadNotificationsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadJobs();
+    _updateNotificationCount();
   }
 
   // Load jobs from database
@@ -63,6 +66,29 @@ class _HomeScreenState extends State<HomeScreen> {
           _isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> _updateNotificationCount() async {
+    if (widget.phoneNumber == null) {
+      return;
+    }
+    
+    try {
+      final dbHelper = DatabaseHelper();
+      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+      
+      if (user != null) {
+        final count = await dbHelper.getUnreadNotificationsCount(user.id!);
+        
+        if (mounted) {
+          setState(() {
+            _unreadNotificationsCount = count;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error updating notification count: $e');
     }
   }
 
@@ -335,7 +361,17 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$date at $time';
   }
 
-  void _applyForJob(Job job) {
+  void _applyForJob(Job job) async {
+    if (widget.phoneNumber == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to apply for jobs'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Show a dialog to confirm application
     showDialog(
       context: context,
@@ -348,15 +384,57 @@ class _HomeScreenState extends State<HomeScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // Here you would implement the actual job application logic
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Application submitted successfully!'),
-                  backgroundColor: AppColors.primaryColor,
-                ),
-              );
+              
+              setState(() {
+                _isLoading = true;
+              });
+              
+              try {
+                // Get current user details
+                final dbHelper = DatabaseHelper();
+                final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+                
+                if (user == null) {
+                  throw Exception('User not found');
+                }
+                
+                // Create job application - make sure all required parameters are provided
+                final application = JobApplication(
+                  jobId: job.id!,
+                  applicantId: user.id!,
+                  applicantName: user.fullName,
+                  applicantPhone: user.phoneNumber,
+                );
+                
+                await dbHelper.insertJobApplication(application);
+                
+                if (!mounted) return;
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Application submitted successfully!'),
+                    backgroundColor: AppColors.primaryColor,
+                  ),
+                );
+              } catch (e) {
+                print('Error applying for job: $e');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _isLoading = false;
+                  });
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryColor,
@@ -432,39 +510,201 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNotificationsTab() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.notifications,
-            size: 80,
-            color: AppColors.secondaryColor,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Notifications',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textColor,
+    if (widget.phoneNumber == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.notifications_off,
+              size: 80,
+              color: AppColors.secondaryColor.withOpacity(0.7),
             ),
-          ),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Text(
-              'You have no new notifications',
-              textAlign: TextAlign.center,
+            const SizedBox(height: 20),
+            const Text(
+              'Not Logged In',
               style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textColor.withOpacity(0.7),
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textColor,
               ),
             ),
+            const SizedBox(height: 16),
+            const Text(
+              'Please log in to view your notifications',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _loadNotifications(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error: ${snapshot.error}'),
+          );
+        }
+        
+        final notifications = snapshot.data ?? [];
+        
+        if (notifications.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.notifications_none,
+                  size: 80,
+                  color: AppColors.secondaryColor.withOpacity(0.7),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'No Notifications',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textColor,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'You don\'t have any notifications yet',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16),
+                ),
+              ],
+            ),
+          );
+        }
+        
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: notifications.length,
+          itemBuilder: (context, index) {
+            final notification = notifications[index];
+            return _buildNotificationCard(notification);
+          },
+        );
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _loadNotifications() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+      
+      if (user == null) {
+        return [];
+      }
+      
+      return await dbHelper.getUserNotifications(user.id!);
+    } catch (e) {
+      print('Error loading notifications: $e');
+      return [];
+    }
+  }
+
+  Widget _buildNotificationCard(Map<String, dynamic> notification) {
+    final bool isNew = notification['status'] == 'pending';
+    final String jobTitle = notification['jobTitle'] ?? 'Unknown Job';
+    final String applicantName = notification['applicantName'];
+    final String applicantPhone = notification['applicantPhone'];
+    final DateTime appliedAt = DateTime.parse(notification['appliedAt']);
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: isNew ? 3 : 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isNew 
+          ? BorderSide(color: AppColors.primaryColor, width: 2)
+          : BorderSide.none,
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          backgroundColor: isNew ? AppColors.primaryColor : Colors.grey[300],
+          child: Icon(
+            Icons.person,
+            color: Colors.white,
           ),
-        ],
+        ),
+        title: Text(
+          'New application for "$jobTitle"',
+          style: TextStyle(
+            fontWeight: isNew ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text('From: $applicantName'),
+            Text('Phone: $applicantPhone'),
+            Text(
+              'Applied on: ${_formatDate(appliedAt)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        trailing: isNew 
+          ? Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor,
+                shape: BoxShape.circle,
+              ),
+            )
+          : null,
+        onTap: () => _viewApplicantProfile(notification),
       ),
     );
+  }
+
+  String _formatDate(DateTime dateTime) {
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
+    final year = dateTime.year;
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    
+    return '$day/$month/$year at $hour:$minute';
+  }
+
+  void _viewApplicantProfile(Map<String, dynamic> notification) {
+    // Navigate to applicant profile
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          phoneNumber: notification['applicantPhone'],
+          viewOnly: true, // Change parameter name to match what UserProfileScreen expects
+        ),
+      ),
+    );
+    
+    // Mark as read by updating status if it's pending
+    if (notification['status'] == 'pending') {
+      DatabaseHelper().updateApplicationStatus(notification['id'], 'viewed')
+      .then((_) {
+        // Refresh notifications
+        setState(() {});
+        _updateNotificationCount(); // Add this to update badge
+      });
+    }
   }
 
   Widget _buildProfilePreview() {
@@ -562,23 +802,31 @@ class _HomeScreenState extends State<HomeScreen> {
           unselectedItemColor: AppColors.textColor.withOpacity(0.5),
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
               activeIcon: Icon(Icons.home),
               label: 'Home',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.search_outlined),
               activeIcon: Icon(Icons.search),
               label: 'Search',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.notifications_outlined),
-              activeIcon: Icon(Icons.notifications),
+              icon: Badge(
+                isLabelVisible: _unreadNotificationsCount > 0,
+                label: Text(_unreadNotificationsCount.toString()),
+                child: const Icon(Icons.notifications_outlined),
+              ),
+              activeIcon: Badge(
+                isLabelVisible: _unreadNotificationsCount > 0,
+                label: Text(_unreadNotificationsCount.toString()),
+                child: const Icon(Icons.notifications),
+              ),
               label: 'Notifications',
             ),
-            BottomNavigationBarItem(
+            const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),
               activeIcon: Icon(Icons.person),
               label: 'Profile',

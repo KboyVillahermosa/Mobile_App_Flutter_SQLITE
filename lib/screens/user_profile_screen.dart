@@ -8,12 +8,14 @@ import 'change_password_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String phoneNumber;
+  final bool viewOnly; // Use this parameter name consistently
   
   const UserProfileScreen({
-    super.key,
+    Key? key,
     required this.phoneNumber,
-  });
-
+    this.viewOnly = false, // Default to false
+  }) : super(key: key);
+  
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
 }

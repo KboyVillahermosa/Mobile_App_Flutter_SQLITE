@@ -4,7 +4,8 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:convert';
 import '../models/user.dart';
-import '../models/job.dart'; // You'll need to create this model
+import '../models/job.dart';
+import '../models/job_application.dart'; // Add this import
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -74,6 +75,21 @@ class DatabaseHelper {
         status TEXT NOT NULL DEFAULT 'open',
         createdAt TEXT NOT NULL,
         FOREIGN KEY (userId) REFERENCES users (id)
+      )
+    ''');
+
+    // Create applications table
+    await db.execute('''
+      CREATE TABLE applications(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        jobId INTEGER NOT NULL,
+        applicantId INTEGER NOT NULL,
+        applicantName TEXT NOT NULL,
+        applicantPhone TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        appliedAt TEXT NOT NULL,
+        FOREIGN KEY (jobId) REFERENCES jobs (id),
+        FOREIGN KEY (applicantId) REFERENCES users (id)
       )
     ''');
   }
@@ -264,5 +280,65 @@ class DatabaseHelper {
     ''');
     
     return jobsWithUserInfo;
+  }
+
+  // New methods for job application functionality
+
+  Future<int> insertJobApplication(JobApplication application) async {
+    Database db = await database;
+    return await db.insert('applications', application.toMap());
+  }
+
+  Future<List<Map<String, dynamic>>> getJobApplications(int jobId) async {
+    Database db = await database;
+    return await db.query(
+      'applications',
+      where: 'jobId = ?',
+      whereArgs: [jobId],
+      orderBy: 'appliedAt DESC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getUserNotifications(int userId) async {
+    Database db = await database;
+    
+    // Get jobs posted by this user
+    final userJobs = await db.query(
+      'jobs',
+      columns: ['id'],
+      where: 'userId = ?',
+      whereArgs: [userId],
+    );
+    
+    if (userJobs.isEmpty) {
+      return [];
+    }
+    
+    // Extract job IDs
+    final jobIds = userJobs.map((job) => job['id'] as int).toList();
+    
+    // Get applications for those jobs
+    return await db.rawQuery('''
+      SELECT applications.*, jobs.title as jobTitle 
+      FROM applications 
+      JOIN jobs ON applications.jobId = jobs.id 
+      WHERE applications.jobId IN (${jobIds.map((_) => '?').join(',')})
+      ORDER BY applications.appliedAt DESC
+    ''', [...jobIds]);
+  }
+
+  Future<int> getUnreadNotificationsCount(int userId) async {
+    final notifications = await getUserNotifications(userId);
+    return notifications.where((n) => n['status'] == 'pending').length;
+  }
+
+  Future<int> updateApplicationStatus(int id, String status) async {
+    Database db = await database;
+    return await db.update(
+      'applications',
+      {'status': status},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }
