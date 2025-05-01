@@ -23,9 +23,21 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'auth.db');
+    
+    // Force delete existing database to create fresh one
+    try {
+      File dbFile = File(path);
+      if (await dbFile.exists()) {
+        await dbFile.delete();
+        print('Deleted existing database to force recreation');
+      }
+    } catch (e) {
+      print('Error deleting database: $e');
+    }
+    
     return await openDatabase(
       path,
-      version: 3, // Increase version from 2 to 3
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -38,7 +50,13 @@ class DatabaseHelper {
         fullName TEXT NOT NULL,
         phoneNumber TEXT NOT NULL UNIQUE,
         password TEXT NOT NULL,
-        profileImage TEXT
+        profileImage TEXT,
+        userRole TEXT,
+        ageGroup TEXT,
+        experienceLevel TEXT,
+        services TEXT,
+        interests TEXT,
+        hasCompletedAssessment INTEGER
       )
     ''');
     
@@ -60,14 +78,17 @@ class DatabaseHelper {
     ''');
   }
 
-  // Update the onUpgrade method to handle version 3
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    print('Upgrading database from version $oldVersion to $newVersion');
+    
     if (oldVersion == 1 && newVersion >= 2) {
+      print('Adding profileImage column');
       // Add the missing profileImage column
       await db.execute('ALTER TABLE users ADD COLUMN profileImage TEXT');
     }
     
     if (oldVersion <= 2 && newVersion >= 3) {
+      print('Creating jobs table');
       // Create jobs table
       await db.execute('''
         CREATE TABLE jobs(
@@ -84,6 +105,18 @@ class DatabaseHelper {
           FOREIGN KEY (userId) REFERENCES users (id)
         )
       ''');
+    }
+    
+    if (oldVersion <= 3 && newVersion >= 4) {
+      print('Adding new user columns for version 4');
+      // Add the new user columns
+      await db.execute('ALTER TABLE users ADD COLUMN userRole TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN ageGroup TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN experienceLevel TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN services TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN interests TEXT');
+      await db.execute('ALTER TABLE users ADD COLUMN hasCompletedAssessment INTEGER');
+      print('Database upgrade to version 4 completed');
     }
   }
 

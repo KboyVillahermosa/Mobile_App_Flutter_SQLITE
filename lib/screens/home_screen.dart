@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:io'; // Add this import for File class
 import 'login_screen.dart';
 import 'user_profile_screen.dart';
-import 'job_posting_screen.dart';
-import '../helpers/database_helper.dart';
-import '../models/job.dart';
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -29,99 +25,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  List<Job> _jobs = [];
-  Map<int, String> _jobUserNames = {}; // Add this map to store job ID -> username
-  bool _isLoading = true;
-  String _userName = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadData(); // Load both jobs and user data
-  }
-
-  // Load both jobs and user data
-  Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      // Load user data if phone number is available
-      if (widget.phoneNumber != null) {
-        await _loadUserData();
-      }
-      
-      // Load jobs
-      await _loadJobs();
-    } catch (e) {
-      print('Error loading data: $e');
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  // Add this method to fetch user data
-  Future<void> _loadUserData() async {
-    try {
-      final dbHelper = DatabaseHelper();
-      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
-      
-      if (user != null) {
-        setState(() {
-          _userName = user.fullName;
-        });
-        print('Loaded user: ${user.fullName}');
-      } else {
-        print('User not found for phone: ${widget.phoneNumber}');
-      }
-    } catch (e) {
-      print('Error loading user data: $e');
-    }
-  }
-
-  // Add this method to fetch jobs
-  Future<void> _loadJobs() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final dbHelper = DatabaseHelper();
-      final jobsData = await dbHelper.getJobsWithUserInfo();
-      
-      print('Loaded ${jobsData.length} jobs from database'); // Add logging
-      
-      List<Job> jobs = [];
-      Map<int, String> jobUserNames = {}; // Map to store job ID -> user name
-      
-      // Convert to Job objects and store user names
-      for (final jobData in jobsData) {
-        final job = Job.fromMap(jobData);
-        jobs.add(job);
-        
-        // Store user name for this job
-        if (jobData.containsKey('fullName')) {
-          jobUserNames[job.id!] = jobData['fullName'];
-        }
-        
-        print('Job: ${job.id} - ${job.title} - ${jobData['fullName']}');
-      }
-
-      setState(() {
-        _jobs = jobs;
-        _jobUserNames = jobUserNames; // Store in class field
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading jobs: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 
   void _onItemTapped(int index) {
     // Always update the selected index first for visual feedback
@@ -164,148 +67,66 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Update the home tab to display job listings
   Widget _buildHomeTab() {
-    return RefreshIndicator(
-      onRefresh: _loadData, // Update to refresh all data
-      child: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primaryColor,
-              ),
-            )
-          : SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Welcome section with user's name
-                    if (widget.phoneNumber != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 24.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _userName.isNotEmpty 
-                                  ? 'Welcome, $_userName!' 
-                                  : 'Welcome to Servebisyo',
-                              style: const TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textColor,
-                              ),
-                            ),
-                            if (_userName.isNotEmpty)
-                              const SizedBox(height: 4),
-                            if (_userName.isNotEmpty)
-                              Text(
-                                'What service do you need today?',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: AppColors.textColor.withOpacity(0.7),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-
-                    // Job list header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Recent Job Postings',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textColor,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            // You could add a "See All" functionality here
-                          },
-                          child: Text(
-                            'See All',
-                            style: TextStyle(
-                              color: AppColors.primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Job listings
-                    _jobs.isEmpty
-                        ? _buildEmptyJobList()
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _jobs.length,
-                            itemBuilder: (context, index) {
-                              return _buildJobCard(_jobs[index]);
-                            },
-                          ),
-                  ],
-                ),
-              ),
-            ),
-    );
-  }
-
-  // Add this method to create an empty state when no jobs
-  Widget _buildEmptyJobList() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 40),
-          Icon(
-            Icons.work_outline,
-            size: 80,
-            color: AppColors.secondaryColor.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No job postings yet',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textColor,
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryColor.withOpacity(0.2),
+                  blurRadius: 15,
+                  spreadRadius: 5,
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Create your first job posting by clicking the button below',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textColor.withOpacity(0.7),
+            child: Icon(
+              Icons.check_circle_outline,
+              color: AppColors.primaryColor,
+              size: 70,
             ),
           ),
           const SizedBox(height: 24),
+          const Text(
+            'Successfully logged in!',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Welcome to Servebisyo',
+            style: TextStyle(fontSize: 18),
+          ),
+          if (widget.phoneNumber != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text(
+                'Phone: ${widget.phoneNumber}',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textColor.withOpacity(0.7),
+                ),
+              ),
+            ),
+          const SizedBox(height: 48),
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.push(
+              Navigator.pushAndRemoveUntil(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => JobPostingScreen(
-                    userId: widget.phoneNumber ?? '',
-                  ),
-                ),
-              ).then((_) => _loadJobs()); // Refresh job list after returning
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
             },
-            icon: const Icon(Icons.add),
-            label: const Text('Create Job Post'),
+            icon: const Icon(Icons.logout),
+            label: const Text('Logout'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-              foregroundColor: Colors.white,
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.textColor,
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
                 vertical: 12,
@@ -313,196 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Add this method to create job cards
-  Widget _buildJobCard(Job job) {
-    // Format date for display
-    final dateTime = job.dateTime;
-    final formattedDate = '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-    final formattedTime =
-        '${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-        
-    // Get the user name for this job
-    final posterName = _jobUserNames[job.id] ?? 'Unknown User';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // If the job has images, show the first one
-          if (job.imagePaths.isNotEmpty)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.file(
-                File(job.imagePaths.first),
-                height: 150,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 150,
-                    color: AppColors.secondaryColor.withOpacity(0.2),
-                    child: Center(
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: AppColors.secondaryColor,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Add the poster's name at the top
-                Row(
-                  children: [
-                    Icon(
-                      Icons.person,
-                      size: 16,
-                      color: AppColors.secondaryColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Posted by: $posterName',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textColor.withOpacity(0.7),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 8),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        job.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: job.status == 'open'
-                            ? AppColors.primaryColor.withOpacity(0.1)
-                            : Colors.grey.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        job.status.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: job.status == 'open'
-                              ? AppColors.primaryColor
-                              : Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                Text(
-                  job.description,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textColor.withOpacity(0.7),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    Icon(
-                      Icons.location_on_outlined,
-                      size: 16,
-                      color: AppColors.secondaryColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        job.location,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Date and time
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_today,
-                          size: 16,
-                          color: AppColors.secondaryColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$formattedDate at $formattedTime',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // Budget
-                    Text(
-                      '\$${job.budget.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primaryColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              elevation: 2,
             ),
           ),
         ],
@@ -641,27 +273,15 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _getBody(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => JobPostingScreen(
-                userId: widget.phoneNumber ?? '',
-              ),
-            ),
-          );
-          
-          if (result == true) {
-            print('Job posted successfully, refreshing data');
-            _loadData(); // Refresh all data after successful posting
-          }
-        },
-        backgroundColor: AppColors.primaryColor,
-        child: const Icon(Icons.add, color: Colors.white),
+      body: Stack(
+        children: [
+          // Background pattern
+          const PatternBackground(),
+
+          // Dynamic content based on selected tab
+          _getBody(),
+        ],
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,

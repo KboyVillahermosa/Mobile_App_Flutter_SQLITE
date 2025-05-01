@@ -8,11 +8,11 @@ import '../helpers/database_helper.dart';
 import '../models/job.dart';
 
 class JobPostingScreen extends StatefulWidget {
-  final String userId;
+  final String phoneNumber;  // Rename from userId to phoneNumber for clarity
 
   const JobPostingScreen({
     super.key,
-    required this.userId,
+    required this.phoneNumber,
   });
 
   @override
@@ -122,7 +122,7 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
       try {
         // Get user by phone number
         final dbHelper = DatabaseHelper();
-        final user = await dbHelper.getUserByPhone(widget.userId);
+        final user = await dbHelper.getUserByPhone(widget.phoneNumber);
         
         if (user == null) {
           throw Exception('User not found');
