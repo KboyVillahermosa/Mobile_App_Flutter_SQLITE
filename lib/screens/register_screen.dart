@@ -110,11 +110,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Logo or App icon
                       Center(
                         child: Container(
-                          width: 100,
-                          height: 100,
+                          width: 120,
+                          height: 120,
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(15),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.primaryColor.withOpacity(0.2),
@@ -123,10 +123,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             ],
                           ),
-                          child: Icon(
-                            Icons.person_add,
-                            size: 50,
-                            color: AppColors.primaryColor,
+                          padding: const EdgeInsets.all(10),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              // This helps debug image loading issues
+                              print('Error loading logo: $error');
+                              return Icon(
+                                Icons.person_add,
+                                size: 50,
+                                color: AppColors.primaryColor,
+                              );
+                            },
                           ),
                         ),
                       ),

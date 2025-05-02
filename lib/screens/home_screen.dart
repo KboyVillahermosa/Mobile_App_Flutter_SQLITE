@@ -407,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                                 Text(
-                                  '\$${job.budget.toStringAsFixed(2)}',
+                                  '₱${job.budget.toStringAsFixed(2)}',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),

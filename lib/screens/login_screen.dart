@@ -4,6 +4,7 @@ import '../services/otp_service.dart';
 import 'otp_verification_screen.dart';
 import 'register_screen.dart';
 
+
 // Color palette definition
 class AppColors {
   static const textColor = Color(0xFF050315);
@@ -129,11 +130,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       // Logo or App icon
                       Center(
                         child: Container(
-                          width: 100,
-                          height: 100,
+                          width: 120,
+                          height: 120,
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(15),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.primaryColor.withOpacity(0.2),
@@ -142,10 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                           ),
-                          child: Icon(
-                            Icons.lock_open_rounded,
-                            size: 50,
-                            color: AppColors.primaryColor,
+                          padding: const EdgeInsets.all(10),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
