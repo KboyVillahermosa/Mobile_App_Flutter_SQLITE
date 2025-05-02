@@ -25,6 +25,9 @@ class DatabaseHelper {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'auth.db');
     
+    bool exists = await File(path).exists();
+    print('Database exists before opening: $exists');
+    
     return await openDatabase(
       path,
       version: 4,
@@ -263,6 +266,20 @@ class DatabaseHelper {
     // Join users and jobs tables to get user name with each job
     final List<Map<String, dynamic>> jobsWithUserInfo = await db.rawQuery('''
       SELECT jobs.*, users.fullName 
+      FROM jobs 
+      INNER JOIN users ON jobs.userId = users.id 
+      ORDER BY jobs.dateTime DESC
+    ''');
+    
+    return jobsWithUserInfo;
+  }
+
+  Future<List<Map<String, dynamic>>> getAllJobsWithUserInfo() async {
+    Database db = await database;
+    
+    // Join jobs with users to get uploader name
+    final List<Map<String, dynamic>> jobsWithUserInfo = await db.rawQuery('''
+      SELECT jobs.*, users.fullName as uploaderName, users.profileImage as uploaderImage
       FROM jobs 
       INNER JOIN users ON jobs.userId = users.id 
       ORDER BY jobs.dateTime DESC
