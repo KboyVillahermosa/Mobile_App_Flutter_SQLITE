@@ -1,11 +1,13 @@
-import 'dart:io'; // Add this import at the top
-import 'package:flutter/material.dart'; // This includes the Badge widget in newer Flutter versions
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'user_profile_screen.dart';
-import 'job_posting_screen.dart'; // Add this import
-import '../helpers/database_helper.dart'; // Add this import
-import '../models/job.dart'; // Add this import
-import '../models/job_application.dart'; // Add this import
+import 'job_posting_screen.dart';
+import '../helpers/database_helper.dart';
+import '../models/job.dart';
+import '../models/job_application.dart';
+import '../models/user.dart'; // Add this import for the User model
+import 'dart:convert'; // Add this for jsonEncode in additionalDetails
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -38,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    DatabaseHelper().checkAndFixApplicationsTable();
     _loadJobs();
     _updateNotificationCount();
   }
@@ -544,6 +547,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$date at $time';
   }
 
+  String _formatDate(DateTime dateTime) {
+    final day = dateTime.day.toString().padLeft(2, '0');
+    final month = dateTime.month.toString().padLeft(2, '0');
+    final year = dateTime.year;
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    
+    return '$day/$month/$year at $hour:$minute';
+  }
+
   // Format time relative to now (e.g., "2 hours ago")
   String _getTimeAgo(DateTime dateTime) {
     final now = DateTime.now();
@@ -573,77 +586,729 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    // Show a dialog to confirm application
-    showDialog(
+    // Get current user details first
+    final dbHelper = DatabaseHelper();
+    final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+    
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User profile not found'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Show application form dialog
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Apply for Job'),
-        content: Text('Would you like to apply for "${job.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              
-              setState(() {
-                _isLoading = true;
-              });
-              
-              try {
-                // Get current user details
-                final dbHelper = DatabaseHelper();
-                final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
-                
-                if (user == null) {
-                  throw Exception('User not found');
-                }
-                
-                // Create job application - make sure all required parameters are provided
-                final application = JobApplication(
-                  jobId: job.id!,
-                  applicantId: user.id!,
-                  applicantName: user.fullName,
-                  applicantPhone: user.phoneNumber,
-                );
-                
-                await dbHelper.insertJobApplication(application);
-                
-                if (!mounted) return;
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Application submitted successfully!'),
-                    backgroundColor: AppColors.primaryColor,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _buildApplicationForm(job, user),
+    );
+  }
+
+  Widget _buildApplicationForm(Job job, User user) {
+    // Form controllers
+    final messageController = TextEditingController();
+    final priceController = TextEditingController(text: job.budget.toString());
+    
+    // Step tracking
+    int currentStep = 0;
+    final int totalSteps = 5;
+
+    // State variables for the form
+    List<String> selectedSkills = [];
+    DateTime? selectedDate;
+    String selectedTimeSlot = 'Morning';
+    bool hasTools = false;
+    bool hasTransportation = false;
+
+    // Skills related to common service jobs
+    final List<String> relevantSkills = [
+      'Gardening', 'Cleaning', 'Plumbing', 'Electrical', 'Carpentry', 
+      'Painting', 'Cooking', 'Pet Care', 'Babysitting', 'Tutoring',
+      'Computer Repair', 'Moving Help', 'Driving', 'Photography',
+      'Repair Work', 'Delivery', 'Laundry', 'Errands'
+    ];
+    
+    return StatefulBuilder(
+      builder: (context, setState) {
+        // Navigation functions
+        void nextStep() {
+          if (currentStep < totalSteps - 1) {
+            setState(() {
+              currentStep++;
+            });
+          }
+        }
+        
+        void previousStep() {
+          if (currentStep > 0) {
+            setState(() {
+              currentStep--;
+            });
+          }
+        }
+        
+        // Validation for each step
+        bool canMoveNext() {
+          switch (currentStep) {
+            case 0: // Skills
+              return selectedSkills.isNotEmpty;
+            case 1: // Availability
+              return selectedDate != null;
+            case 2: // Price proposal
+              return priceController.text.isNotEmpty;
+            case 3: // Additional info
+              return true; // Always valid
+            default:
+              return true;
+          }
+        }
+        
+        // Submit application
+        void submitApplication() async {
+          try {
+            print("Creating job application");
+            final dbHelper = DatabaseHelper();
+            
+            // Create enhanced job application with additional info
+            final application = JobApplication(
+              jobId: job.id!,
+              applicantId: user.id!,
+              applicantName: user.fullName,
+              applicantPhone: user.phoneNumber,
+              // Add additional application details
+              additionalDetails: {
+                'skills': selectedSkills.join(', '),
+                'date': '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
+                'timeSlot': selectedTimeSlot,
+                'priceOffer': priceController.text,
+                'hasTools': hasTools.toString(),
+                'hasTransportation': hasTransportation.toString(),
+                'message': messageController.text,
+              },
+            );
+            
+            print("Application created, about to insert: ${application.toMap()}");
+            final result = await dbHelper.insertJobApplication(application);
+            print("Database insert result: $result");
+            
+            Navigator.pop(context); // Close the form
+            
+            // Show success dialog
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  title: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: AppColors.primaryColor,
+                        size: 30,
+                      ),
+                      SizedBox(width: 10),
+                      Text('Success!'),
+                    ],
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        height: 120,
+                        width: 120,
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryColor.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.thumb_up,
+                          size: 60,
+                          color: AppColors.primaryColor,
+                        ),
+                      ),
+                      SizedBox(height: 20),
+                      Text(
+                        'Your application was submitted successfully!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'The job poster will be notified about your application.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      child: Text(
+                        'OK',
+                        style: TextStyle(
+                          color: AppColors.primaryColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
                 );
-              } catch (e) {
-                print('Error applying for job: $e');
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error: ${e.toString()}'),
-                      backgroundColor: Colors.red,
+              },
+            );
+          } catch (e) {
+            print('Error applying for job: $e');
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Error: ${e.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+        
+        // Step content widgets
+        Widget buildSkillsStep() {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Select your relevant skills',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: relevantSkills.map((skill) {
+                  final isSelected = selectedSkills.contains(skill);
+                  return FilterChip(
+                    label: Text(skill),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          selectedSkills.add(skill);
+                        } else {
+                          selectedSkills.remove(skill);
+                        }
+                      });
+                    },
+                    backgroundColor: Colors.grey[200],
+                    selectedColor: AppColors.primaryColor.withOpacity(0.2),
+                    checkmarkColor: AppColors.primaryColor,
+                    labelStyle: TextStyle(
+                      color: isSelected ? AppColors.primaryColor : Colors.black87,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                     ),
                   );
-                }
-              } finally {
-                if (mounted) {
-                  setState(() {
-                    _isLoading = false;
-                  });
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryColor,
-            ),
-            child: const Text('Apply'),
-          ),
-        ],
-      ),
+                }).toList(),
+              ),
+              SizedBox(height: 8),
+              if (selectedSkills.isEmpty)
+                Text(
+                  'Please select at least one skill to continue',
+                  style: TextStyle(
+                    color: Colors.red[400],
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          );
+        }
+        
+        Widget buildAvailabilityStep() {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'When are you available?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Select date:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now().add(const Duration(days: 1)),
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 30)),
+                  );
+                  
+                  if (date != null) {
+                    setState(() {
+                      selectedDate = date;
+                    });
+                  }
+                },
+                icon: Icon(Icons.calendar_today),
+                label: Text(
+                  selectedDate != null
+                      ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                      : 'Select Date',
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Select time slot:',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedTimeSlot,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                items: ['Morning', 'Afternoon', 'Evening', 'Flexible']
+                    .map((slot) => DropdownMenuItem(
+                          value: slot,
+                          child: Text(slot),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      selectedTimeSlot = value;
+                    });
+                  }
+                },
+              ),
+              SizedBox(height: 8),
+              if (selectedDate == null)
+                Text(
+                  'Please select a date to continue',
+                  style: TextStyle(
+                    color: Colors.red[400],
+                    fontSize: 12,
+                  ),
+                ),
+            ],
+          );
+        }
+        
+        Widget buildPriceStep() {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Your price proposal',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'How much would you charge for this job?',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 16),
+              TextFormField(
+                controller: priceController,
+                decoration: InputDecoration(
+                  labelText: 'Your Rate (₱)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  prefixIcon: Icon(Icons.attach_money),
+                  helperText: 'The job poster\'s budget is ₱${job.budget}',
+                ),
+                keyboardType: TextInputType.number,
+              ),
+            ],
+          );
+        }
+        
+        Widget buildAdditionalInfoStep() {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Additional Information',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Do you have the following?',
+                style: TextStyle(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 8),
+              Card(
+                elevation: 0,
+                color: Colors.grey[100],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      title: Text('I have my own tools'),
+                      subtitle: Text('Required equipment for the job'),
+                      value: hasTools,
+                      onChanged: (value) {
+                        setState(() {
+                          hasTools = value;
+                        });
+                      },
+                    ),
+                    Divider(height: 1, indent: 16, endIndent: 16),
+                    SwitchListTile(
+                      title: Text('I have transportation'),
+                      subtitle: Text('Means to travel to the job location'),
+                      value: hasTransportation,
+                      onChanged: (value) {
+                        setState(() {
+                          hasTransportation = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+        
+        Widget buildMessageStep() {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Message to job poster',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Introduce yourself and explain why you\'re suitable for this job',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 16),
+              TextFormField(
+                controller: messageController,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  hintText: 'Write your message here...',
+                  alignLabelWithHint: true,
+                ),
+                maxLines: 6,
+                minLines: 4,
+              ),
+              SizedBox(height: 24),
+              Text(
+                'Application Summary:',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Card(
+                elevation: 0,
+                color: Colors.grey[100],
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.star_outline, size: 16, color: AppColors.secondaryColor),
+                          SizedBox(width: 8),
+                          Text(
+                            'Skills: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Expanded(
+                            child: Text(
+                              selectedSkills.isEmpty ? 'None selected' : selectedSkills.join(', '),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.secondaryColor),
+                          SizedBox(width: 8),
+                          Text(
+                            'Available: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(selectedDate == null 
+                            ? 'Not selected' 
+                            : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year} ($selectedTimeSlot)'),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.payments_outlined, size: 16, color: AppColors.secondaryColor),
+                          SizedBox(width: 8),
+                          Text(
+                            'Price: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text('₱${priceController.text}'),
+                        ],
+                      ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.check_circle_outline, size: 16, color: AppColors.secondaryColor),
+                          SizedBox(width: 8),
+                          Text(
+                            'Has Tools: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(hasTools ? 'Yes' : 'No'),
+                          SizedBox(width: 16),
+                          Text(
+                            'Transportation: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(hasTransportation ? 'Yes' : 'No'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
+        
+        // Get current step content
+        Widget getCurrentStepContent() {
+          switch (currentStep) {
+            case 0:
+              return buildSkillsStep();
+            case 1:
+              return buildAvailabilityStep();
+            case 2:
+              return buildPriceStep();
+            case 3:
+              return buildAdditionalInfoStep();
+            case 4:
+              return buildMessageStep();
+            default:
+              return Container();
+          }
+        }
+        
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          maxChildSize: 0.95,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  // Header with step indicator
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Colors.grey[200]!,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        // Draggable handle
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        // Title
+                        Text(
+                          'Apply for "${job.title}"',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 16),
+                        // Step indicator
+                        Row(
+                          children: List.generate(
+                            totalSteps,
+                            (index) => Expanded(
+                              child: Container(
+                                height: 4,
+                                margin: EdgeInsets.symmetric(horizontal: 2),
+                                decoration: BoxDecoration(
+                                  color: index <= currentStep 
+                                    ? AppColors.primaryColor 
+                                    : Colors.grey[300],
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        // Step title
+                        Text(
+                          'Step ${currentStep + 1} of $totalSteps',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Step content
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: scrollController,
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: getCurrentStepContent(),
+                      ),
+                    ),
+                  ),
+                  
+                  // Navigation buttons
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 5,
+                          offset: Offset(0, -3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        // Back button (except on first step)
+                        if (currentStep > 0)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: previousStep,
+                              style: OutlinedButton.styleFrom(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text('Back'),
+                            ),
+                          ),
+                        if (currentStep > 0)
+                          SizedBox(width: 16),
+                        
+                        // Next or Submit button
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: canMoveNext() 
+                              ? (currentStep < totalSteps - 1 
+                                  ? nextStep 
+                                  : submitApplication)
+                              : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryColor,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              disabledBackgroundColor: Colors.grey[300],
+                            ),
+                            child: Text(
+                              currentStep < totalSteps - 1 ? 'Next' : 'Submit Application',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -945,6 +1610,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final String applicantPhone = notification['applicantPhone'];
     final DateTime appliedAt = DateTime.parse(notification['appliedAt']);
     
+    // Parse additional details if available
+    Map<String, dynamic>? assessmentDetails;
+    if (notification['additionalDetails'] != null) {
+      try {
+        assessmentDetails = jsonDecode(notification['additionalDetails']);
+      } catch (e) {
+        print('Error decoding assessment details: $e');
+      }
+    }
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: isNew ? 3 : 1,
@@ -954,59 +1629,206 @@ class _HomeScreenState extends State<HomeScreen> {
           ? BorderSide(color: AppColors.primaryColor, width: 2)
           : BorderSide.none,
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          backgroundColor: isNew ? AppColors.primaryColor : Colors.grey[300],
-          child: Icon(
-            Icons.person,
-            color: Colors.white,
-          ),
-        ),
-        title: Text(
-          'New application for "$jobTitle"',
-          style: TextStyle(
-            fontWeight: isNew ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text('From: $applicantName'),
-            Text('Phone: $applicantPhone'),
-            Text(
-              'Applied on: ${_formatDate(appliedAt)}',
+      child: Column(
+        children: [
+          // Application header
+          ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            leading: CircleAvatar(
+              backgroundColor: isNew ? AppColors.primaryColor : Colors.grey[300],
+              backgroundImage: notification['applicantImage'] != null 
+                  ? FileImage(File(notification['applicantImage']))
+                  : null,
+              child: notification['applicantImage'] == null
+                  ? Icon(Icons.person, color: Colors.white)
+                  : null,
+            ),
+            title: Text(
+              'New application for "$jobTitle"',
               style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
+                fontWeight: isNew ? FontWeight.bold : FontWeight.normal,
               ),
             ),
-          ],
-        ),
-        trailing: isNew 
-          ? Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: AppColors.primaryColor,
-                shape: BoxShape.circle,
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text('From: $applicantName'),
+                Text('Phone: $applicantPhone'),
+                Text(
+                  'Applied on: ${_formatDate(appliedAt)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+            trailing: isNew 
+              ? Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor,
+                    shape: BoxShape.circle,
+                  ),
+                )
+              : null,
+          ),
+          
+          // Assessment details section (only if details exist)
+          if (assessmentDetails != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(),
+                  
+                  // Skills
+                  if (assessmentDetails['skills'] != null)
+                    _buildAssessmentItem(
+                      'Skills', 
+                      assessmentDetails['skills'],
+                      Icons.star_outline,
+                    ),
+                  
+                  // Price offer
+                  if (assessmentDetails['priceOffer'] != null)
+                    _buildAssessmentItem(
+                      'Price Offer', 
+                      '₱${assessmentDetails['priceOffer']}',
+                      Icons.payments_outlined,
+                    ),
+                  
+                  if (assessmentDetails['date'] != null)
+                    _buildAssessmentItem(
+                      'Available', 
+                      '${assessmentDetails['date']} (${assessmentDetails['timeSlot'] ?? 'Flexible'})',
+                      Icons.calendar_today_outlined,
+                    ),
+                  
+                  // Tools & Transportation
+                  Row(
+                    children: [
+                      if (assessmentDetails['hasTools'] == 'true')
+                        Chip(
+                          label: const Text('Has Tools'),
+                          avatar: Icon(Icons.handyman_outlined, size: 16),
+                          backgroundColor: AppColors.accentColor.withOpacity(0.2),
+                          labelStyle: TextStyle(fontSize: 12),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      const SizedBox(width: 8),
+                      if (assessmentDetails['hasTransportation'] == 'true')
+                        Chip(
+                          label: const Text('Has Transport'),
+                          avatar: Icon(Icons.directions_car_outlined, size: 16),
+                          backgroundColor: AppColors.secondaryColor.withOpacity(0.2),
+                          labelStyle: TextStyle(fontSize: 12),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                  
+                  // Message preview
+                  if (assessmentDetails['message'] != null && assessmentDetails['message'].toString().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Message:',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            assessmentDetails['message'].length > 80
+                                ? '${assessmentDetails['message'].substring(0, 80)}...'
+                                : assessmentDetails['message'],
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
-            )
-          : null,
-        onTap: () => _viewApplicantProfile(notification),
+            ),
+            
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => _viewApplicantProfile(notification),
+                  child: Text('View Profile'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => _contactApplicant(notification),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text('Contact'),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  String _formatDate(DateTime dateTime) {
-    final day = dateTime.day.toString().padLeft(2, '0');
-    final month = dateTime.month.toString().padLeft(2, '0');
-    final year = dateTime.year;
-    final hour = dateTime.hour.toString().padLeft(2, '0');
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    
-    return '$day/$month/$year at $hour:$minute';
+  // Helper method for assessment items
+  Widget _buildAssessmentItem(String label, String value, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: AppColors.secondaryColor),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Add this method to handle contacting applicants
+  void _contactApplicant(Map<String, dynamic> notification) {
+    // Implementation for contacting the applicant
+    // This could launch a phone call, messaging app, etc.
+    final String phoneNumber = notification['applicantPhone'];
+    // For now, just show a snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Contacting ${notification['applicantName']} at $phoneNumber'),
+      ),
+    );
   }
 
   void _viewApplicantProfile(Map<String, dynamic> notification) {
@@ -1016,7 +1838,7 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (context) => UserProfileScreen(
           phoneNumber: notification['applicantPhone'],
-          viewOnly: true, // Change parameter name to match what UserProfileScreen expects
+          viewOnly: true,
         ),
       ),
     );
@@ -1027,7 +1849,7 @@ class _HomeScreenState extends State<HomeScreen> {
       .then((_) {
         // Refresh notifications
         setState(() {});
-        _updateNotificationCount(); // Add this to update badge
+        _updateNotificationCount(); // Update badge count
       });
     }
   }
@@ -1068,6 +1890,34 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  // Add this method to your _HomeScreenState class
+  Future<void> _testDatabaseInsert(Job job, User user) async {
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.insert(
+        'applications',
+        {
+          'jobId': job.id!,
+          'applicantId': user.id!,
+          'applicantName': user.fullName,
+          'applicantPhone': user.phoneNumber,
+          'status': 'pending',
+          'appliedAt': DateTime.now().toIso8601String(),
+          // No additionalDetails to simplify test
+        },
+      );
+      print("Test insert successful: $result");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Test insert successful')),
+      );
+    } catch (e) {
+      print("Test insert failed: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Test failed: $e')),
+      );
+    }
   }
 
   @override

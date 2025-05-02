@@ -30,9 +30,9 @@ class DatabaseHelper {
     
     return await openDatabase(
       path,
-      version: 4,
+      version: 2, // Increment this version number
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
+      onUpgrade: _onUpgrade, // Make sure this is added
     );
   }
 
@@ -80,6 +80,7 @@ class DatabaseHelper {
         applicantPhone TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
         appliedAt TEXT NOT NULL,
+        additionalDetails TEXT,
         FOREIGN KEY (jobId) REFERENCES jobs (id),
         FOREIGN KEY (applicantId) REFERENCES users (id)
       )
@@ -87,44 +88,14 @@ class DatabaseHelper {
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    print('Upgrading database from version $oldVersion to $newVersion');
-    
-    if (oldVersion == 1 && newVersion >= 2) {
-      print('Adding profileImage column');
-      // Add the missing profileImage column
-      await db.execute('ALTER TABLE users ADD COLUMN profileImage TEXT');
-    }
-    
-    if (oldVersion <= 2 && newVersion >= 3) {
-      print('Creating jobs table');
-      // Create jobs table
-      await db.execute('''
-        CREATE TABLE jobs(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          userId INTEGER NOT NULL,
-          title TEXT NOT NULL,
-          description TEXT NOT NULL,
-          budget REAL NOT NULL,
-          location TEXT NOT NULL,
-          dateTime TEXT NOT NULL,
-          imagePaths TEXT,
-          status TEXT NOT NULL DEFAULT 'open',
-          createdAt TEXT NOT NULL,
-          FOREIGN KEY (userId) REFERENCES users (id)
-        )
-      ''');
-    }
-    
-    if (oldVersion <= 3 && newVersion >= 4) {
-      print('Adding new user columns for version 4');
-      // Add the new user columns
-      await db.execute('ALTER TABLE users ADD COLUMN userRole TEXT');
-      await db.execute('ALTER TABLE users ADD COLUMN ageGroup TEXT');
-      await db.execute('ALTER TABLE users ADD COLUMN experienceLevel TEXT');
-      await db.execute('ALTER TABLE users ADD COLUMN services TEXT');
-      await db.execute('ALTER TABLE users ADD COLUMN interests TEXT');
-      await db.execute('ALTER TABLE users ADD COLUMN hasCompletedAssessment INTEGER');
-      print('Database upgrade to version 4 completed');
+    if (oldVersion < 2) {
+      try {
+        // Add additionalDetails column if it doesn't exist
+        await db.execute('ALTER TABLE applications ADD COLUMN additionalDetails TEXT');
+        print('Added additionalDetails column to applications table');
+      } catch (e) {
+        print('Error adding column (may already exist): $e');
+      }
     }
   }
 
@@ -139,6 +110,20 @@ class DatabaseHelper {
       'users',
       where: 'phoneNumber = ?',
       whereArgs: [phoneNumber],
+    );
+
+    if (maps.isNotEmpty) {
+      return User.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  Future<User?> getUserById(int id) async {
+    Database db = await database;
+    List<Map<String, dynamic>> maps = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [id],
     );
 
     if (maps.isNotEmpty) {
@@ -291,8 +276,18 @@ class DatabaseHelper {
   // New methods for job application functionality
 
   Future<int> insertJobApplication(JobApplication application) async {
-    Database db = await database;
-    return await db.insert('applications', application.toMap());
+    final db = await database;
+    try {
+      print("Inserting into applications table: ${application.toMap()}");
+      return await db.insert(
+        'applications',  // Make sure this is the correct table name
+        application.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      print("Database insertion error: $e");
+      throw e;  // Re-throw to show in UI
+    }
   }
 
   Future<List<Map<String, dynamic>>> getJobApplications(int jobId) async {
@@ -323,19 +318,50 @@ class DatabaseHelper {
     // Extract job IDs
     final jobIds = userJobs.map((job) => job['id'] as int).toList();
     
-    // Get applications for those jobs
+    // Get applications for those jobs with complete details
     return await db.rawQuery('''
-      SELECT applications.*, jobs.title as jobTitle 
+      SELECT 
+        applications.*, 
+        jobs.title as jobTitle,
+        jobs.budget as jobBudget,
+        users.profileImage as applicantImage,
+        users.userRole as applicantRole,
+        users.experienceLevel as applicantExperience
       FROM applications 
       JOIN jobs ON applications.jobId = jobs.id 
+      JOIN users ON applications.applicantId = users.id
       WHERE applications.jobId IN (${jobIds.map((_) => '?').join(',')})
       ORDER BY applications.appliedAt DESC
     ''', [...jobIds]);
   }
 
   Future<int> getUnreadNotificationsCount(int userId) async {
-    final notifications = await getUserNotifications(userId);
-    return notifications.where((n) => n['status'] == 'pending').length;
+    final db = await database;
+    
+    // Get jobs posted by this user
+    final userJobs = await db.query(
+      'jobs',
+      columns: ['id'],
+      where: 'userId = ?',
+      whereArgs: [userId],
+    );
+    
+    if (userJobs.isEmpty) {
+      return 0;
+    }
+    
+    // Extract job IDs
+    final jobIds = userJobs.map((job) => job['id'] as int).toList();
+    
+    // Count unread notifications (pending applications)
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count 
+      FROM applications 
+      WHERE jobId IN (${jobIds.map((_) => '?').join(',')})
+      AND status = 'pending'
+    ''', [...jobIds]);
+    
+    return result.first['count'] as int;
   }
 
   Future<int> updateApplicationStatus(int id, String status) async {
@@ -346,5 +372,23 @@ class DatabaseHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // Add this diagnostic method to your DatabaseHelper class
+
+  Future<void> checkAndFixApplicationsTable() async {
+    final db = await database;
+    try {
+      // Check if the additionalDetails column exists
+      var columns = await db.rawQuery('PRAGMA table_info(applications)');
+      bool hasAdditionalDetails = columns.any((column) => column['name'] == 'additionalDetails');
+      
+      if (!hasAdditionalDetails) {
+        print("Adding missing additionalDetails column to applications table");
+        await db.execute('ALTER TABLE applications ADD COLUMN additionalDetails TEXT');
+      }
+    } catch (e) {
+      print("Error checking/fixing database schema: $e");
+    }
   }
 }

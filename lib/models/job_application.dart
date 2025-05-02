@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
 
 class JobApplication {
   final int? id;
@@ -6,9 +6,10 @@ class JobApplication {
   final int applicantId;
   final String applicantName;
   final String applicantPhone;
-  final String status; // 'pending', 'accepted', 'rejected'
+  final String status;
   final DateTime appliedAt;
-  
+  final Map<String, dynamic>? additionalDetails;
+
   JobApplication({
     this.id,
     required this.jobId,
@@ -17,8 +18,9 @@ class JobApplication {
     required this.applicantPhone,
     this.status = 'pending',
     DateTime? appliedAt,
+    this.additionalDetails,
   }) : this.appliedAt = appliedAt ?? DateTime.now();
-  
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -28,18 +30,7 @@ class JobApplication {
       'applicantPhone': applicantPhone,
       'status': status,
       'appliedAt': appliedAt.toIso8601String(),
+      'additionalDetails': additionalDetails != null ? jsonEncode(additionalDetails) : null,
     };
-  }
-  
-  factory JobApplication.fromMap(Map<String, dynamic> map) {
-    return JobApplication(
-      id: map['id'],
-      jobId: map['jobId'],
-      applicantId: map['applicantId'],
-      applicantName: map['applicantName'],
-      applicantPhone: map['applicantPhone'],
-      status: map['status'],
-      appliedAt: DateTime.parse(map['appliedAt']),
-    );
   }
 }
