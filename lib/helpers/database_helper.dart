@@ -25,17 +25,6 @@ class DatabaseHelper {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'auth.db');
     
-    // Force delete existing database to create fresh one
-    try {
-      File dbFile = File(path);
-      if (await dbFile.exists()) {
-        await dbFile.delete();
-        print('Deleted existing database to force recreation');
-      }
-    } catch (e) {
-      print('Error deleting database: $e');
-    }
-    
     return await openDatabase(
       path,
       version: 4,
