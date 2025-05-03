@@ -152,6 +152,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          if (!widget.viewOnly && _user != null)
+            IconButton(
+              icon: const Icon(Icons.settings),
+              onPressed: _showSettingsSidebar,
+              tooltip: 'Settings',
+            ),
+        ],
       ),
       body: _isLoading
           ? Center(
@@ -242,9 +250,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               // Achievements section
                               _buildAchievementsSection(),
                               
-                              // Action buttons
-                              if (!widget.viewOnly) _buildActionButtons(),
-                              
                               const SizedBox(height: 40),
                             ],
                           ),
@@ -257,105 +262,185 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
   
   Widget _buildProfileHeader() {
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            // Avatar
-            Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryColor.withOpacity(0.3),
-                    blurRadius: 20,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: CircleAvatar(
-                radius: 70,
-                backgroundColor: Colors.white,
-                backgroundImage: _user?.profileImage != null
-                    ? FileImage(File(_user!.profileImage!))
-                    : null,
-                child: _user?.profileImage == null
-                    ? Icon(
-                        Icons.person,
-                        size: 70,
-                        color: AppColors.secondaryColor.withOpacity(0.7),
-                      )
-                    : null,
-              ),
-            ),
-            
-            // Edit button for image
-            if (!widget.viewOnly)
-              GestureDetector(
-                onTap: _isUpdatingImage ? null : _updateProfileImage,
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.secondaryColor,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 5,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: _isUpdatingImage
-                      ? const SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                ),
-              ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primaryColor.withOpacity(0.05),
+            AppColors.accentColor.withOpacity(0.15),
           ],
         ),
-        const SizedBox(height: 16),
-        
-        // User name with verification badge
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              _user!.fullName,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              // Avatar with enhanced appearance
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primaryColor.withOpacity(0.3),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 70,
+                  backgroundColor: Colors.white,
+                  backgroundImage: _user?.profileImage != null
+                      ? FileImage(File(_user!.profileImage!))
+                      : null,
+                  child: _user?.profileImage == null
+                      ? Icon(
+                          Icons.person,
+                          size: 70,
+                          color: AppColors.secondaryColor.withOpacity(0.7),
+                        )
+                      : null,
+                ),
               ),
+              
+              // Edit button for image - only show small indicator if in settings now
+              if (!widget.viewOnly)
+                GestureDetector(
+                  onTap: _isUpdatingImage ? null : () => _showSettingsSidebar(),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 5,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                    child: _isUpdatingImage
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.edit,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          
+          // User name with verification badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                _user!.fullName,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textColor,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.verified,
+                size: 20,
+                color: AppColors.primaryColor,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '+${_user!.phoneNumber}',
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.textColor.withOpacity(0.7),
             ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.verified,
-              size: 20,
-              color: AppColors.primaryColor,
+          ),
+          
+          // Add visual user stats if you have any (optional)
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  spreadRadius: 0,
+                ),
+              ],
             ),
-          ],
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildStatItem('Applications', '0'),
+                _buildDivider(),
+                _buildStatItem('Achievements', '${_parseAchievements().length}'),
+                _buildDivider(),
+                _buildStatItem('Status', 'Active'),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primaryColor,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
-          '+${_user!.phoneNumber}',
+          label,
           style: TextStyle(
-            fontSize: 16,
-            color: AppColors.textColor.withOpacity(0.7),
+            fontSize: 12,
+            color: Colors.grey[600],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      height: 30,
+      width: 1,
+      color: Colors.grey.withOpacity(0.3),
     );
   }
 
@@ -897,64 +982,231 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
-  Widget _buildActionButtons() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        ElevatedButton.icon(
-          onPressed: _navigateToEditProfile,
-          icon: const Icon(Icons.edit),
-          label: const Text(
-            'Edit Profile',
-            style: TextStyle(fontSize: 16),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primaryColor,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            elevation: 0,
-          ),
+  void _showSettingsSidebar() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _buildSettingsSidebar(),
+    );
+  }
+
+  Widget _buildSettingsSidebar() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.85,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
         ),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _navigateToChangePassword,
-          icon: const Icon(Icons.lock_outline),
-          label: const Text(
-            'Change Password',
-            style: TextStyle(fontSize: 16),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.secondaryColor,
-            side: BorderSide(color: AppColors.secondaryColor),
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          // Handle bar at top
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        ElevatedButton.icon(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ApplicationHistoryScreen(
-                  phoneNumber: widget.phoneNumber,
+          
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.settings,
+                    color: AppColors.primaryColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Text(
+                  'Settings',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          const Divider(height: 1),
+          
+          // Settings options
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildSettingsItem(
+                  icon: Icons.person_outline,
+                  title: 'Edit Profile',
+                  subtitle: 'Update your personal information',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigateToEditProfile();
+                  },
+                ),
+                _buildSettingsItem(
+                  icon: Icons.lock_outline,
+                  title: 'Change Password',
+                  subtitle: 'Update your account password',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _navigateToChangePassword();
+                  },
+                ),
+                _buildSettingsItem(
+                  icon: Icons.history,
+                  title: 'Application History',
+                  subtitle: 'View your previous applications',
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ApplicationHistoryScreen(
+                          phoneNumber: widget.phoneNumber,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _buildSettingsItem(
+                  icon: Icons.image,
+                  title: 'Change Profile Photo',
+                  subtitle: 'Update your profile picture',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _updateProfileImage();
+                  },
+                ),
+                _buildSettingsItem(
+                  icon: Icons.workspace_premium,
+                  title: 'Manage Achievements',
+                  subtitle: 'Add or edit your certificates',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editAchievements();
+                  },
+                ),
+                _buildSettingsItem(
+                  icon: Icons.edit_note,
+                  title: 'Edit Bio',
+                  subtitle: 'Update your personal bio',
+                  onTap: () {
+                    Navigator.pop(context);
+                    _editBio();
+                  },
+                  showDivider: false,
+                ),
+              ],
+            ),
+          ),
+          
+          // Close button
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondaryColor,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 54),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            );
-          },
-          icon: const Icon(Icons.history),
-          label: const Text('Application History'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.secondaryColor,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: const Text(
+                'Close',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool showDivider = true,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppColors.primaryColor,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textColor,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
           ),
         ),
+        if (showDivider)
+          const Divider(
+            height: 1,
+            indent: 70,
+            endIndent: 20,
+          ),
       ],
     );
   }
