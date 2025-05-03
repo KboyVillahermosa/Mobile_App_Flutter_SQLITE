@@ -39,13 +39,13 @@ class Job {
       'description': description,
       'budget': budget,
       'location': location,
-      'dateTime': dateTime.toIso8601String(),
-      'imagePaths': jsonEncode(imagePaths),
+      'dateTime': dateTime.toIso8601String(),  // Convert DateTime to string
+      'imagePaths': jsonEncode(imagePaths),    // Convert List to JSON string
       'status': status,
-      'createdAt': createdAt.toIso8601String(),
-      'uploaderName': uploaderName,
-      'uploaderImage': uploaderImage,
-      'currentImageIndex': currentImageIndex, // Include currentImageIndex in the map
+      'createdAt': createdAt.toIso8601String(), // Convert DateTime to string
+      'uploaderName': uploaderName ?? '',
+      'uploaderImage': uploaderImage ?? '',
+      'currentImageIndex': currentImageIndex,
     };
   }
 

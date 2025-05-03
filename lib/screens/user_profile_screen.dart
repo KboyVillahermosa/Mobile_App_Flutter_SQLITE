@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../services/image_picker_service.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
+import 'application_history_screen.dart';
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -491,6 +492,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ApplicationHistoryScreen(
+                  phoneNumber: widget.phoneNumber,
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.history),
+          label: const Text('Application History'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           ),
         ),
       ],

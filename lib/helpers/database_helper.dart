@@ -30,9 +30,9 @@ class DatabaseHelper {
     
     return await openDatabase(
       path,
-      version: 2, // Increment this version number
+      version: 4, // Increment from 3 to 4
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade, // Make sure this is added
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -57,16 +57,18 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE jobs(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        userId INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        description TEXT NOT NULL,
-        budget REAL NOT NULL,
-        location TEXT NOT NULL,
-        dateTime TEXT NOT NULL,
+        userId INTEGER,
+        title TEXT,
+        description TEXT,
+        budget REAL,
+        location TEXT,
+        dateTime TEXT,
         imagePaths TEXT,
-        status TEXT NOT NULL DEFAULT 'open',
-        createdAt TEXT NOT NULL,
-        FOREIGN KEY (userId) REFERENCES users (id)
+        status TEXT,
+        createdAt TEXT,
+        uploaderName TEXT,
+        uploaderImage TEXT,
+        currentImageIndex INTEGER
       )
     ''');
 
@@ -95,6 +97,25 @@ class DatabaseHelper {
         print('Added additionalDetails column to applications table');
       } catch (e) {
         print('Error adding column (may already exist): $e');
+      }
+    }
+    
+    if (oldVersion < 3) {
+      try {
+        await db.execute('ALTER TABLE jobs ADD COLUMN uploaderName TEXT');
+        await db.execute('ALTER TABLE jobs ADD COLUMN uploaderImage TEXT');
+        print('Added uploaderName and uploaderImage columns to jobs table');
+      } catch (e) {
+        print('Error adding columns to jobs table: $e');
+      }
+    }
+
+    if (oldVersion < 4) {
+      try {
+        await db.execute('ALTER TABLE jobs ADD COLUMN currentImageIndex INTEGER');
+        print('Added currentImageIndex column to jobs table');
+      } catch (e) {
+        print('Error adding currentImageIndex column: $e');
       }
     }
   }
@@ -364,13 +385,13 @@ class DatabaseHelper {
     return result.first['count'] as int;
   }
 
-  Future<int> updateApplicationStatus(int id, String status) async {
-    Database db = await database;
+  Future<int> updateApplicationStatus(int applicationId, String status) async {
+    final db = await database;
     return await db.update(
       'applications',
       {'status': status},
       where: 'id = ?',
-      whereArgs: [id],
+      whereArgs: [applicationId],
     );
   }
 
@@ -390,5 +411,50 @@ class DatabaseHelper {
     } catch (e) {
       print("Error checking/fixing database schema: $e");
     }
+  }
+
+  // Add this method to DatabaseHelper
+  Future<void> forceUpgradeDatabaseSchema() async {
+    final db = await database;
+    try {
+      // Add missing columns if they don't exist
+      await db.execute('ALTER TABLE jobs ADD COLUMN uploaderName TEXT');
+      await db.execute('ALTER TABLE jobs ADD COLUMN uploaderImage TEXT');
+      print('Manually added uploaderName and uploaderImage columns');
+    } catch (e) {
+      print('Error adding columns (may already exist): $e');
+    }
+  }
+
+  // Add this method to fetch user's job applications
+  Future<List<Map<String, dynamic>>> getUserApplicationHistory(int userId) async {
+    final db = await database;
+    
+    final List<Map<String, dynamic>> results = await db.rawQuery('''
+      SELECT 
+        a.id AS applicationId,
+        a.status,
+        a.appliedAt,
+        a.additionalDetails,
+        j.id AS jobId,
+        j.title,
+        j.description,
+        j.budget,
+        j.location,
+        j.dateTime,
+        j.status AS jobStatus,
+        j.uploaderName,
+        j.uploaderImage
+      FROM 
+        applications a
+      INNER JOIN 
+        jobs j ON a.jobId = j.id
+      WHERE 
+        a.applicantId = ?
+      ORDER BY 
+        a.appliedAt DESC
+    ''', [userId]);
+    
+    return results;
   }
 }

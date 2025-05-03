@@ -37,6 +37,19 @@ class _HomeScreenState extends State<HomeScreen> {
   int _unreadNotificationsCount = 0;
   Map<int, int> _imageIndexMap = {}; // Maps job.id to current image index
 
+  // Form controllers - move OUTSIDE of the build method to persist
+  final TextEditingController _messageController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
+
+  // State variables for the form - store these in class properties instead
+  int _currentStep = 0;
+  final int _totalSteps = 5;
+  List<String> _selectedSkills = [];
+  DateTime? _selectedDate;
+  String _selectedTimeSlot = 'Morning';
+  bool _hasTools = false;
+  bool _hasTransportation = false;
+
   @override
   void initState() {
     super.initState();
@@ -612,57 +625,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildApplicationForm(Job job, User user) {
-    // Form controllers
-    final messageController = TextEditingController();
-    final priceController = TextEditingController(text: job.budget.toString());
-    
-    // Step tracking
-    int currentStep = 0;
-    final int totalSteps = 5;
-
-    // State variables for the form
-    List<String> selectedSkills = [];
-    DateTime? selectedDate;
-    String selectedTimeSlot = 'Morning';
-    bool hasTools = false;
-    bool hasTransportation = false;
-
-    // Skills related to common service jobs
-    final List<String> relevantSkills = [
-      'Gardening', 'Cleaning', 'Plumbing', 'Electrical', 'Carpentry', 
-      'Painting', 'Cooking', 'Pet Care', 'Babysitting', 'Tutoring',
-      'Computer Repair', 'Moving Help', 'Driving', 'Photography',
-      'Repair Work', 'Delivery', 'Laundry', 'Errands'
-    ];
-    
     return StatefulBuilder(
       builder: (context, setState) {
         // Navigation functions
         void nextStep() {
-          if (currentStep < totalSteps - 1) {
+          if (_currentStep < _totalSteps - 1) {
             setState(() {
-              currentStep++;
+              _currentStep++;
             });
           }
         }
         
         void previousStep() {
-          if (currentStep > 0) {
+          if (_currentStep > 0) {
             setState(() {
-              currentStep--;
+              _currentStep--;
             });
           }
         }
         
         // Validation for each step
         bool canMoveNext() {
-          switch (currentStep) {
+          switch (_currentStep) {
             case 0: // Skills
-              return selectedSkills.isNotEmpty;
+              return _selectedSkills.isNotEmpty;
             case 1: // Availability
-              return selectedDate != null;
+              return _selectedDate != null;
             case 2: // Price proposal
-              return priceController.text.isNotEmpty;
+              return _priceController.text.isNotEmpty;
             case 3: // Additional info
               return true; // Always valid
             default:
@@ -684,13 +674,13 @@ class _HomeScreenState extends State<HomeScreen> {
               applicantPhone: user.phoneNumber,
               // Add additional application details
               additionalDetails: {
-                'skills': selectedSkills.join(', '),
-                'date': '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
-                'timeSlot': selectedTimeSlot,
-                'priceOffer': priceController.text,
-                'hasTools': hasTools.toString(),
-                'hasTransportation': hasTransportation.toString(),
-                'message': messageController.text,
+                'skills': _selectedSkills.join(', '),
+                'date': '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                'timeSlot': _selectedTimeSlot,
+                'priceOffer': _priceController.text,
+                'hasTools': _hasTools.toString(),
+                'hasTransportation': _hasTransportation.toString(),
+                'message': _messageController.text,
               },
             );
             
@@ -797,17 +787,22 @@ class _HomeScreenState extends State<HomeScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: relevantSkills.map((skill) {
-                  final isSelected = selectedSkills.contains(skill);
+                children: [
+                  'Gardening', 'Cleaning', 'Plumbing', 'Electrical', 'Carpentry', 
+                  'Painting', 'Cooking', 'Pet Care', 'Babysitting', 'Tutoring',
+                  'Computer Repair', 'Moving Help', 'Driving', 'Photography',
+                  'Repair Work', 'Delivery', 'Laundry', 'Errands'
+                ].map((skill) {
+                  final isSelected = _selectedSkills.contains(skill);
                   return FilterChip(
                     label: Text(skill),
                     selected: isSelected,
                     onSelected: (selected) {
                       setState(() {
                         if (selected) {
-                          selectedSkills.add(skill);
+                          _selectedSkills.add(skill);
                         } else {
-                          selectedSkills.remove(skill);
+                          _selectedSkills.remove(skill);
                         }
                       });
                     },
@@ -822,7 +817,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }).toList(),
               ),
               SizedBox(height: 8),
-              if (selectedSkills.isEmpty)
+              if (_selectedSkills.isEmpty)
                 Text(
                   'Please select at least one skill to continue',
                   style: TextStyle(
@@ -864,14 +859,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   
                   if (date != null) {
                     setState(() {
-                      selectedDate = date;
+                      _selectedDate = date;
                     });
                   }
                 },
                 icon: Icon(Icons.calendar_today),
                 label: Text(
-                  selectedDate != null
-                      ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                  _selectedDate != null
+                      ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
                       : 'Select Date',
                 ),
                 style: OutlinedButton.styleFrom(
@@ -890,7 +885,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: selectedTimeSlot,
+                value: _selectedTimeSlot,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -906,13 +901,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 onChanged: (value) {
                   if (value != null) {
                     setState(() {
-                      selectedTimeSlot = value;
+                      _selectedTimeSlot = value;
                     });
                   }
                 },
               ),
               SizedBox(height: 8),
-              if (selectedDate == null)
+              if (_selectedDate == null)
                 Text(
                   'Please select a date to continue',
                   style: TextStyle(
@@ -944,7 +939,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(height: 16),
               TextFormField(
-                controller: priceController,
+                controller: _priceController,
                 decoration: InputDecoration(
                   labelText: 'Your Rate (₱)',
                   border: OutlineInputBorder(
@@ -989,10 +984,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     SwitchListTile(
                       title: Text('I have my own tools'),
                       subtitle: Text('Required equipment for the job'),
-                      value: hasTools,
+                      value: _hasTools,
                       onChanged: (value) {
                         setState(() {
-                          hasTools = value;
+                          _hasTools = value;
                         });
                       },
                     ),
@@ -1000,10 +995,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     SwitchListTile(
                       title: Text('I have transportation'),
                       subtitle: Text('Means to travel to the job location'),
-                      value: hasTransportation,
+                      value: _hasTransportation,
                       onChanged: (value) {
                         setState(() {
-                          hasTransportation = value;
+                          _hasTransportation = value;
                         });
                       },
                     ),
@@ -1034,7 +1029,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               SizedBox(height: 16),
               TextFormField(
-                controller: messageController,
+                controller: _messageController,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -1075,7 +1070,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           Expanded(
                             child: Text(
-                              selectedSkills.isEmpty ? 'None selected' : selectedSkills.join(', '),
+                              _selectedSkills.isEmpty ? 'None selected' : _selectedSkills.join(', '),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -1090,9 +1085,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Available: ',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text(selectedDate == null 
+                          Text(_selectedDate == null 
                             ? 'Not selected' 
-                            : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year} ($selectedTimeSlot)'),
+                            : '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year} ($_selectedTimeSlot)'),
                         ],
                       ),
                       SizedBox(height: 8),
@@ -1104,7 +1099,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Price: ',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text('₱${priceController.text}'),
+                          Text('₱${_priceController.text}'),
                         ],
                       ),
                       SizedBox(height: 8),
@@ -1116,13 +1111,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             'Has Tools: ',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text(hasTools ? 'Yes' : 'No'),
+                          Text(_hasTools ? 'Yes' : 'No'),
                           SizedBox(width: 16),
                           Text(
                             'Transportation: ',
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          Text(hasTransportation ? 'Yes' : 'No'),
+                          Text(_hasTransportation ? 'Yes' : 'No'),
                         ],
                       ),
                     ],
@@ -1135,7 +1130,7 @@ class _HomeScreenState extends State<HomeScreen> {
         
         // Get current step content
         Widget getCurrentStepContent() {
-          switch (currentStep) {
+          switch (_currentStep) {
             case 0:
               return buildSkillsStep();
             case 1:
@@ -1202,13 +1197,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         // Step indicator
                         Row(
                           children: List.generate(
-                            totalSteps,
+                            _totalSteps,
                             (index) => Expanded(
                               child: Container(
                                 height: 4,
                                 margin: EdgeInsets.symmetric(horizontal: 2),
                                 decoration: BoxDecoration(
-                                  color: index <= currentStep 
+                                  color: index <= _currentStep 
                                     ? AppColors.primaryColor 
                                     : Colors.grey[300],
                                   borderRadius: BorderRadius.circular(2),
@@ -1220,7 +1215,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         SizedBox(height: 8),
                         // Step title
                         Text(
-                          'Step ${currentStep + 1} of $totalSteps',
+                          'Step ${_currentStep + 1} of $_totalSteps',
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 14,
@@ -1257,7 +1252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Row(
                       children: [
                         // Back button (except on first step)
-                        if (currentStep > 0)
+                        if (_currentStep > 0)
                           Expanded(
                             child: OutlinedButton(
                               onPressed: previousStep,
@@ -1270,7 +1265,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Text('Back'),
                             ),
                           ),
-                        if (currentStep > 0)
+                        if (_currentStep > 0)
                           SizedBox(width: 16),
                         
                         // Next or Submit button
@@ -1278,7 +1273,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           flex: 2,
                           child: ElevatedButton(
                             onPressed: canMoveNext() 
-                              ? (currentStep < totalSteps - 1 
+                              ? (_currentStep < _totalSteps - 1 
                                   ? nextStep 
                                   : submitApplication)
                               : null,
@@ -1292,7 +1287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               disabledBackgroundColor: Colors.grey[300],
                             ),
                             child: Text(
-                              currentStep < totalSteps - 1 ? 'Next' : 'Submit Application',
+                              _currentStep < _totalSteps - 1 ? 'Next' : 'Submit Application',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
