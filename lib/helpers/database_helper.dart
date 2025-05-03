@@ -27,7 +27,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       path,
-      version: 6, // Increment version to trigger migration
+      version: 7, // Increment version to trigger migration
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -140,6 +140,21 @@ class DatabaseHelper {
         print('Added achievements column to users table');
       } catch (e) {
         print('Error adding achievements column (may already exist): $e');
+      }
+    }
+
+    if (oldVersion < 7) { // Use appropriate version number
+      try {
+        // Check if additionalDetails column exists
+        var columns = await db.rawQuery('PRAGMA table_info(applications)');
+        bool hasAdditionalDetails = columns.any((column) => column['name'] == 'additionalDetails');
+        
+        if (!hasAdditionalDetails) {
+          await db.execute('ALTER TABLE applications ADD COLUMN additionalDetails TEXT');
+          print('Added additionalDetails column to applications table');
+        }
+      } catch (e) {
+        print('Error updating applications schema: $e');
       }
     }
   }
@@ -341,17 +356,20 @@ class DatabaseHelper {
   // New methods for job application functionality
 
   Future<int> insertJobApplication(JobApplication application) async {
-    final db = await database;
     try {
-      print("Inserting into applications table: ${application.toMap()}");
-      return await db.insert(
-        'applications',  // Make sure this is the correct table name
-        application.toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      final db = await database;
+      
+      // Convert additional details to JSON string
+      final Map<String, dynamic> applicationData = application.toMap();
+      if (applicationData.containsKey('additionalDetails') && 
+          applicationData['additionalDetails'] is Map<String, dynamic>) {
+        applicationData['additionalDetails'] = jsonEncode(applicationData['additionalDetails']);
+      }
+      
+      return await db.insert('applications', applicationData);
     } catch (e) {
-      print("Database insertion error: $e");
-      throw e;  // Re-throw to show in UI
+      print('Error inserting job application: $e');
+      rethrow;
     }
   }
 
@@ -500,5 +518,14 @@ class DatabaseHelper {
     ''', [userId]);
     
     return results;
+  }
+
+  // Add this to your DatabaseHelper class initialization
+  Future<void> ensureDirectoriesExist() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final resumeDir = Directory('${appDir.path}/resumes');
+    if (!await resumeDir.exists()) {
+      await resumeDir.create(recursive: true);
+    }
   }
 }

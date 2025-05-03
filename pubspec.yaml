@@ -17,6 +17,7 @@ dependencies:
   image_picker: ^1.0.4  # For selecting images
   shared_preferences: ^2.5.3
   intl: ^0.18.1         # For date formatting
+  file_picker: ^5.3.1
 
 dev_dependencies:
   flutter_test:

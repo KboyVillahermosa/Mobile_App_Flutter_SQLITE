@@ -8,6 +8,9 @@ import '../models/job.dart';
 import '../models/job_application.dart';
 import '../models/user.dart'; // Add this import for the User model
 import 'dart:convert'; // Add this for jsonEncode in additionalDetails
+import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import '../services/image_picker_service.dart';
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -43,12 +46,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // State variables for the form - store these in class properties instead
   int _currentStep = 0;
-  final int _totalSteps = 5;
+  final int _totalSteps = 6; // Increase from 5 to 6
   List<String> _selectedSkills = [];
   DateTime? _selectedDate;
   String _selectedTimeSlot = 'Morning';
   bool _hasTools = false;
   bool _hasTransportation = false;
+  String? _resumePath;
+  String? _bioDataImagePath;
 
   @override
   void initState() {
@@ -588,6 +593,49 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<String?> _pickPDF() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+      
+      if (result != null) {
+        File file = File(result.files.single.path!);
+        
+        // Copy file to app's documents directory for persistence
+        final appDir = await getApplicationDocumentsDirectory();
+        final fileName = 'resume_${DateTime.now().millisecondsSinceEpoch}.pdf';
+        final savedFile = await file.copy('${appDir.path}/resumes/$fileName');
+        
+        return savedFile.path;
+      }
+      return null;
+    } catch (e) {
+      print('Error picking PDF: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error selecting PDF file')),
+      );
+      return null;
+    }
+  }
+
+  Future<String?> _pickBioDataImage() async {
+    try {
+      final File? image = await ImagePickerService.showImageSourceDialog(context);
+      if (image == null) return null;
+      
+      final String imagePath = await ImagePickerService.saveImagePermanently(image);
+      return imagePath;
+    } catch (e) {
+      print('Error picking bio data image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error selecting image')),
+      );
+      return null;
+    }
+  }
+
   void _applyForJob(Job job) async {
     if (widget.phoneNumber == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -655,6 +703,8 @@ class _HomeScreenState extends State<HomeScreen> {
               return _priceController.text.isNotEmpty;
             case 3: // Additional info
               return true; // Always valid
+            case 4: // Documents
+              return true; // Optional step
             default:
               return true;
           }
@@ -681,6 +731,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 'hasTools': _hasTools.toString(),
                 'hasTransportation': _hasTransportation.toString(),
                 'message': _messageController.text,
+                'resumePath': _resumePath, // Add resume path
+                'bioDataImagePath': _bioDataImagePath, // Add bio data image path
               },
             );
             
@@ -804,7 +856,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         } else {
                           _selectedSkills.remove(skill);
                         }
-                      });
+                        });
                     },
                     backgroundColor: Colors.grey[200],
                     selectedColor: AppColors.primaryColor.withOpacity(0.2),
@@ -1009,6 +1061,275 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
         
+        Widget buildDocumentsStep() {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Upload Documents (Optional)',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Adding a resume or bio data can increase your chances of getting hired',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                ),
+              ),
+              SizedBox(height: 24),
+              
+              // Resume upload section
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.description,
+                            color: AppColors.primaryColor,
+                            size: 22,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Resume (PDF)',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Upload your CV or resume',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    if (_resumePath == null)
+                      Center(
+                        child: OutlinedButton.icon(
+                          icon: Icon(Icons.upload_file),
+                          label: Text('Select PDF'),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          onPressed: () async {
+                            final path = await _pickPDF();
+                            if (path != null) {
+                              setState(() {
+                                _resumePath = path;
+                              });
+                            }
+                          },
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primaryColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.picture_as_pdf,
+                              color: Colors.red[700],
+                              size: 36,
+                            ),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Resume.pdf',
+                                    style: TextStyle(fontWeight: FontWeight.w500),
+                                  ),
+                                  Text(
+                                    'PDF file selected',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close),
+                              onPressed: () {
+                                setState(() {
+                                  _resumePath = null;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 20),
+              
+              // Bio Data Image upload section
+              Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondaryColor.withOpacity(0.1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.badge,
+                            color: AppColors.secondaryColor,
+                            size: 22,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Bio Data Image',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Upload a photo of your handwritten bio data',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16),
+                    if (_bioDataImagePath == null)
+                      Center(
+                        child: OutlinedButton.icon(
+                          icon: Icon(Icons.add_photo_alternate),
+                          label: Text('Select Image'),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                          onPressed: () async {
+                            final path = await _pickBioDataImage();
+                            if (path != null) {
+                              setState(() {
+                                _bioDataImagePath = path;
+                              });
+                            }
+                          },
+                        ),
+                      )
+                    else
+                      Stack(
+                        alignment: Alignment.topRight,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.file(
+                              File(_bioDataImagePath!),
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Container(
+                              padding: EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.6),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.close, color: Colors.white, size: 16),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _bioDataImagePath = null;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 24),
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryColor.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primaryColor.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.lightbulb_outline, color: AppColors.primaryColor),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Tip: Adding these documents is optional but can significantly improve your chances of getting hired.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        }
+        
         Widget buildMessageStep() {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1120,6 +1441,28 @@ class _HomeScreenState extends State<HomeScreen> {
                           Text(_hasTransportation ? 'Yes' : 'No'),
                         ],
                       ),
+                      SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.attach_file, size: 16, color: AppColors.secondaryColor),
+                          SizedBox(width: 8),
+                          Text(
+                            'Documents: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Expanded(
+                            child: Text(
+                              (_resumePath != null && _bioDataImagePath != null) 
+                                  ? 'Resume & Bio Data'
+                                  : (_resumePath != null) 
+                                      ? 'Resume Only' 
+                                      : (_bioDataImagePath != null)
+                                          ? 'Bio Data Only'
+                                          : 'None provided',
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1140,6 +1483,8 @@ class _HomeScreenState extends State<HomeScreen> {
             case 3:
               return buildAdditionalInfoStep();
             case 4:
+              return buildDocumentsStep(); // New documents step
+            case 5:
               return buildMessageStep();
             default:
               return Container();
@@ -1726,6 +2071,32 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   
+                  // Resume & Bio Data
+                  if (assessmentDetails?['resumePath'] != null || 
+                      assessmentDetails?['bioDataImagePath'] != null) 
+                    const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (assessmentDetails?['resumePath'] != null)
+                        Chip(
+                          label: const Text('Resume'),
+                          avatar: Icon(Icons.description, size: 16),
+                          backgroundColor: Colors.blue[100],
+                          labelStyle: TextStyle(fontSize: 12),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      const SizedBox(width: 8),
+                      if (assessmentDetails?['bioDataImagePath'] != null)
+                        Chip(
+                          label: const Text('Bio Data'),
+                          avatar: Icon(Icons.badge, size: 16),
+                          backgroundColor: Colors.purple[100],
+                          labelStyle: TextStyle(fontSize: 12),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
+                  ),
+                  
                   // Message preview
                   if (assessmentDetails['message'] != null && assessmentDetails['message'].toString().isNotEmpty)
                     Padding(
@@ -1765,6 +2136,15 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (assessmentDetails != null && 
+                    (assessmentDetails['resumePath'] != null || assessmentDetails['bioDataImagePath'] != null))
+                  TextButton.icon(
+                    icon: Icon(Icons.description),
+                    label: Text('Documents'),
+                    onPressed: assessmentDetails != null 
+                      ? () => _viewApplicationDocuments(assessmentDetails!) 
+                      : null,
+                  ),
                 TextButton(
                   onPressed: () => _viewApplicantProfile(notification),
                   child: Text('View Profile'),
@@ -1847,6 +2227,136 @@ class _HomeScreenState extends State<HomeScreen> {
         _updateNotificationCount(); // Update badge count
       });
     }
+  }
+
+  void _viewResumePDF(String pdfPath) {
+    // You'll need to implement a PDF viewer
+    // For now, show a dialog confirming the PDF exists
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.picture_as_pdf, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Resume PDF'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('PDF file is available at:'),
+            SizedBox(height: 8),
+            Text(
+              pdfPath,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'To view PDFs, you need to integrate a PDF viewer package like flutter_pdfview',
+              style: TextStyle(fontStyle: FontStyle.italic, fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _viewBioDataImage(String imagePath) {
+    // Show full-screen image viewer
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text('Bio Data Image'),
+            backgroundColor: AppColors.primaryColor,
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 3.0,
+              child: Image.file(
+                File(imagePath),
+                errorBuilder: (context, error, stackTrace) {
+                  return Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.broken_image, size: 100, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('Could not load image'),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _viewApplicationDocuments(Map<String, dynamic> assessmentDetails) {
+    final resumePath = assessmentDetails['resumePath'];
+    final bioDataPath = assessmentDetails['bioDataImagePath'];
+    
+    if (resumePath == null && bioDataPath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No documents provided by this applicant')),
+      );
+      return;
+    }
+    
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Application Documents',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20),
+            if (resumePath != null)
+              ListTile(
+                leading: Icon(Icons.picture_as_pdf, color: Colors.red, size: 36),
+                title: Text('Resume'),
+                subtitle: Text('View applicant\'s PDF resume'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _viewResumePDF(resumePath);
+                },
+              ),
+            if (bioDataPath != null)
+              ListTile(
+                leading: Icon(Icons.image, color: Colors.blue, size: 36),
+                title: Text('Bio Data Image'),
+                subtitle: Text('View applicant\'s bio data'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _viewBioDataImage(bioDataPath);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildProfilePreview() {
