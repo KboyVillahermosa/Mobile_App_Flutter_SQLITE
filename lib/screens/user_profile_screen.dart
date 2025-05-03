@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../helpers/database_helper.dart';
 import '../models/user.dart';
@@ -6,6 +7,7 @@ import '../services/image_picker_service.dart';
 import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 import 'application_history_screen.dart';
+import 'achievements_editor_screen.dart';
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -230,9 +232,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               _buildProfileHeader(),
                               SizedBox(height: isSmallScreen ? 16 : 24),
                               
+                              // Bio section
+                              _buildBioSection(),
+                              
                               // Profile details card
                               _buildProfileCard(),
                               SizedBox(height: isSmallScreen ? 16 : 24),
+                              
+                              // Achievements section
+                              _buildAchievementsSection(),
                               
                               // Action buttons
                               if (!widget.viewOnly) _buildActionButtons(),
@@ -454,6 +462,439 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildBioSection() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.secondaryColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.description_outlined, color: AppColors.secondaryColor),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'About Me',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textColor,
+                      ),
+                    ),
+                  ],
+                ),
+                if (!widget.viewOnly)
+                  IconButton(
+                    onPressed: _editBio,
+                    icon: const Icon(Icons.edit, color: AppColors.secondaryColor),
+                    tooltip: 'Edit Bio',
+                  ),
+              ],
+            ),
+          ),
+          
+          // Bio content
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: _user?.bio != null && _user!.bio!.isNotEmpty
+                ? Text(
+                    _user!.bio!,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.5,
+                      color: AppColors.textColor,
+                    ),
+                  )
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.edit_note,
+                            size: 48,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            widget.viewOnly 
+                                ? 'No bio available'
+                                : 'Add a bio to tell others about yourself',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (!widget.viewOnly)
+                            TextButton(
+                              onPressed: _editBio,
+                              child: const Text('Add Bio'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.primaryColor,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAchievementsSection() {
+    List<Map<String, dynamic>> achievements = _parseAchievements();
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primaryColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.workspace_premium, color: AppColors.primaryColor),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Achievements & Certificates',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textColor,
+                      ),
+                    ),
+                  ],
+                ),
+                if (!widget.viewOnly)
+                  IconButton(
+                    onPressed: _editAchievements,
+                    icon: const Icon(Icons.edit, color: AppColors.primaryColor),
+                    tooltip: 'Edit Achievements',
+                  ),
+              ],
+            ),
+          ),
+          
+          // Achievements content
+          achievements.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.emoji_events_outlined,
+                          size: 48,
+                          color: Colors.grey[400],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          widget.viewOnly 
+                              ? 'No achievements available'
+                              : 'Add your achievements and certificates',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (!widget.viewOnly)
+                          TextButton(
+                            onPressed: _editAchievements,
+                            child: const Text('Add Achievements'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primaryColor,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: achievements.length,
+                  itemBuilder: (context, index) {
+                    final achievement = achievements[index];
+                    return _buildAchievementItem(achievement);
+                  },
+                ),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _parseAchievements() {
+    if (_user?.achievements == null || _user!.achievements!.isEmpty) {
+      return [];
+    }
+    
+    try {
+      final List<dynamic> decoded = jsonDecode(_user!.achievements!);
+      return decoded.map((item) => Map<String, dynamic>.from(item)).toList();
+    } catch (e) {
+      print('Error parsing achievements: $e');
+      return [];
+    }
+  }
+
+  Widget _buildAchievementItem(Map<String, dynamic> achievement) {
+    final String title = achievement['title'] ?? 'Unnamed Achievement';
+    final String issuer = achievement['issuer'] ?? '';
+    final String date = achievement['date'] ?? '';
+    final String? description = achievement['description'];
+    final String? imagePath = achievement['imagePath'];
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      elevation: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Display certificate image if available
+          if (imagePath != null)
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              child: GestureDetector(
+                onTap: () => _viewFullImage(imagePath),
+                child: Image.file(
+                  File(imagePath),
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, error, _) => Container(
+                    width: double.infinity,
+                    height: 100,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium,
+                    color: AppColors.primaryColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: AppColors.textColor,
+                        ),
+                      ),
+                      if (issuer.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          issuer,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                      if (date.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Issued: $date',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                      if (description != null && description.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          description,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.4,
+                            color: AppColors.textColor,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _viewFullImage(String imagePath) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppBar(
+              title: const Text('Certificate'),
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            InteractiveViewer(
+              panEnabled: true,
+              boundaryMargin: const EdgeInsets.all(20.0),
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.file(
+                File(imagePath),
+                fit: BoxFit.contain,
+                height: MediaQuery.of(context).size.height * 0.7,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _editBio() async {
+    final TextEditingController bioController = TextEditingController(text: _user?.bio);
+    
+    final String? result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit Bio'),
+        content: TextField(
+          controller: bioController,
+          decoration: const InputDecoration(
+            hintText: 'Tell others about yourself...',
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 5,
+          maxLength: 500,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, bioController.text),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+            ),
+            child: const Text('SAVE'),
+          ),
+        ],
+      ),
+    );
+    
+    if (result != null && _user != null) {
+      try {
+        await _dbHelper.updateBio(_user!.id!, result);
+        await _loadUserProfile();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bio updated successfully'),
+            backgroundColor: AppColors.primaryColor,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update bio: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _editAchievements() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AchievementsEditorScreen(
+          userId: _user!.id!,
+          initialAchievements: _parseAchievements(),
+        ),
+      ),
+    );
+    
+    if (result == true) {
+      await _loadUserProfile();
+    }
   }
 
   Widget _buildActionButtons() {

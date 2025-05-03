@@ -25,12 +25,9 @@ class DatabaseHelper {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'auth.db');
     
-    bool exists = await File(path).exists();
-    print('Database exists before opening: $exists');
-    
     return await openDatabase(
       path,
-      version: 4, // Increment from 3 to 4
+      version: 6, // Increment version to trigger migration
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -118,6 +115,33 @@ class DatabaseHelper {
         print('Error adding currentImageIndex column: $e');
       }
     }
+
+    if (oldVersion < 5) {
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN bio TEXT');
+        await db.execute('ALTER TABLE users ADD COLUMN achievements TEXT');
+        print('Added bio and achievements columns to users table');
+      } catch (e) {
+        print('Error adding bio and achievements columns: $e');
+      }
+    }
+
+    if (oldVersion < 6) {
+      try {
+        // Add bio and achievements columns to users table
+        await db.execute('ALTER TABLE users ADD COLUMN bio TEXT');
+        print('Added bio column to users table');
+      } catch (e) {
+        print('Error adding bio column (may already exist): $e');
+      }
+      
+      try {
+        await db.execute('ALTER TABLE users ADD COLUMN achievements TEXT');
+        print('Added achievements column to users table');
+      } catch (e) {
+        print('Error adding achievements column (may already exist): $e');
+      }
+    }
   }
 
   Future<int> insertUser(User user) async {
@@ -190,6 +214,26 @@ class DatabaseHelper {
       {'profileImage': imagePath},
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  Future<int> updateBio(int userId, String bio) async {
+    final db = await database;
+    return await db.update(
+      'users',
+      {'bio': bio},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<int> updateAchievements(int userId, String achievements) async {
+    final db = await database;
+    return await db.update(
+      'users',
+      {'achievements': achievements},
+      where: 'id = ?',
+      whereArgs: [userId],
     );
   }
 
