@@ -11,6 +11,8 @@ import 'dart:convert'; // Add this for jsonEncode in additionalDetails
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/image_picker_service.dart';
+import 'message_screen.dart';
+import 'conversations_screen.dart'; // Add this import for ConversationsScreen
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -38,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Job> _jobs = [];
   bool _isLoading = false;
   int _unreadNotificationsCount = 0;
+  int _unreadMessagesCount = 0; // Add this state variable
   Map<int, int> _imageIndexMap = {}; // Maps job.id to current image index
 
   // Form controllers - move OUTSIDE of the build method to persist
@@ -59,8 +62,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     DatabaseHelper().checkAndFixApplicationsTable();
+    DatabaseHelper().ensureNotificationsTableExists(); // Add this line
     _loadJobs();
     _updateNotificationCount();
+    _updateUnreadMessagesCount();
   }
 
   // Load jobs from database
@@ -122,14 +127,57 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _updateUnreadMessagesCount() async {
+    if (widget.phoneNumber == null) return;
+    
+    try {
+      final dbHelper = DatabaseHelper();
+      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+      
+      if (user != null) {
+        final count = await dbHelper.getUnreadMessagesCount(user.id!);
+        
+        if (mounted) {
+          setState(() {
+            _unreadMessagesCount = count;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error updating unread messages count: $e');
+    }
+  }
+
   void _onItemTapped(int index) {
-    // Always update the selected index first for visual feedback
     setState(() {
       _selectedIndex = index;
     });
 
+    // Handle navigation for messages tab
+    if (index == 2 && widget.phoneNumber != null) {
+      final dbHelper = DatabaseHelper();
+      dbHelper.getUserByPhone(widget.phoneNumber!).then((user) {
+        if (user != null) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ConversationsScreen(
+                userId: user.id!,
+              ),
+            ),
+          ).then((_) {
+            // When returning from messages, reset to home tab
+            setState(() {
+              _selectedIndex = 0;
+            });
+            _updateUnreadMessagesCount();
+          });
+        }
+      });
+    }
+
     // For profile tab, navigate to the profile screen
-    if (index == 3 && widget.phoneNumber != null) {
+    if (index == 4 && widget.phoneNumber != null) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -153,10 +201,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return _buildHomeTab();
       case 1:
         return _buildSearchTab();
-      case 2:
-        return _buildNotificationsTab();
       case 3:
-        // For index 3, we navigate to profile screen, but still need a body
+        return _buildNotificationsTab();
+      case 4:
+        // For index 4, we navigate to profile screen, but still need a body
         return _buildProfilePreview();
       default:
         return _buildHomeTab();
@@ -2145,19 +2193,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? () => _viewApplicationDocuments(assessmentDetails!) 
                       : null,
                   ),
+                TextButton.icon(
+                  icon: Icon(Icons.message_outlined),
+                  label: Text('Message'),
+                  onPressed: () => _openMessageDialog(notification),
+                ),
                 TextButton(
                   onPressed: () => _viewApplicantProfile(notification),
                   child: Text('View Profile'),
                 ),
                 const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () => _contactApplicant(notification),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryColor,
-                    foregroundColor: Colors.white,
+                notification['status'] == 'hired' ? 
+                  OutlinedButton.icon(
+                    icon: Icon(Icons.check_circle, color: Colors.green),
+                    label: Text('Hired', style: TextStyle(color: Colors.green)),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.green),
+                    ),
+                    onPressed: null,
+                  ) :
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.handshake_outlined),
+                    label: Text('Hire'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => _hireApplicant(notification),
                   ),
-                  child: Text('Contact'),
-                ),
               ],
             ),
           ),
@@ -2194,16 +2257,41 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Add this method to handle contacting applicants
-  void _contactApplicant(Map<String, dynamic> notification) {
-    // Implementation for contacting the applicant
-    // This could launch a phone call, messaging app, etc.
-    final String phoneNumber = notification['applicantPhone'];
-    // For now, just show a snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Contacting ${notification['applicantName']} at $phoneNumber'),
-      ),
-    );
+  void _contactApplicant(Map<String, dynamic> notification) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+      
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: Could not find your user profile')),
+        );
+        return;
+      }
+      
+      // Open message screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MessageScreen(
+            jobId: notification['jobId'],
+            jobTitle: notification['jobTitle'] ?? 'Unknown Job',
+            senderId: user.id!,
+            receiverId: notification['applicantId'],
+            receiverName: notification['applicantName'],
+          ),
+        ),
+      ).then((_) {
+        // Refresh notifications when returning from messages
+        _updateNotificationCount();
+        setState(() {});
+      });
+    } catch (e) {
+      print('Error contacting applicant: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   void _viewApplicantProfile(Map<String, dynamic> notification) {
@@ -2314,30 +2402,17 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
     
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
+      builder: (context) => AlertDialog(
+        title: Text('Application Documents'),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Application Documents',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 20),
             if (resumePath != null)
               ListTile(
-                leading: Icon(Icons.picture_as_pdf, color: Colors.red, size: 36),
-                title: Text('Resume'),
-                subtitle: Text('View applicant\'s PDF resume'),
+                leading: Icon(Icons.picture_as_pdf, color: Colors.red),
+                title: Text('Resume PDF'),
                 onTap: () {
                   Navigator.pop(context);
                   _viewResumePDF(resumePath);
@@ -2345,9 +2420,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             if (bioDataPath != null)
               ListTile(
-                leading: Icon(Icons.image, color: Colors.blue, size: 36),
+                leading: Icon(Icons.image, color: Colors.blue),
                 title: Text('Bio Data Image'),
-                subtitle: Text('View applicant\'s bio data'),
                 onTap: () {
                   Navigator.pop(context);
                   _viewBioDataImage(bioDataPath);
@@ -2355,8 +2429,251 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close'),
+          ),
+        ],
       ),
     );
+  }
+
+  void _openMessageDialog(Map<String, dynamic> notification) {
+    final TextEditingController messageController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Message to ${notification['applicantName']}'),
+            SizedBox(height: 4),
+            Text(
+              'Regarding: ${notification['jobTitle']}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: messageController,
+              decoration: InputDecoration(
+                hintText: 'Type your message here...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+              maxLines: 5,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              if (messageController.text.isNotEmpty) {
+                _sendMessage(
+                  notification,
+                  messageController.text,
+                );
+                Navigator.pop(context);
+              }
+            },
+            child: Text('Send Message'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendMessage(Map<String, dynamic> notification, String message) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+      
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: Could not find your user profile')),
+        );
+        return;
+      }
+      
+      // Create message data
+      final messageData = {
+        'senderId': user.id,
+        'receiverId': notification['applicantId'],
+        'jobId': notification['jobId'],
+        'message': message,
+        'timestamp': DateTime.now().toIso8601String(),
+        'isRead': 0,
+      };
+      
+      // Insert message into database
+      await dbHelper.insertMessage(messageData);
+      
+      // Create notification for applicant
+      await dbHelper.createNotification(
+        notification['applicantId'],
+        user.id!,
+        'message',
+        'New message regarding ${notification['jobTitle']}',
+        jsonEncode({'jobId': notification['jobId'], 'messagePreview': message}),
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Message sent to ${notification['applicantName']}'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Mark application as viewed if it was pending
+      if (notification['status'] == 'pending') {
+        await dbHelper.updateApplicationStatus(notification['id'], 'viewed');
+        _updateNotificationCount();
+        setState(() {});
+      }
+      
+    } catch (e) {
+      print('Error sending message: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending message: $e')),
+      );
+    }
+  }
+
+  void _hireApplicant(Map<String, dynamic> notification) {
+    final TextEditingController hireMessageController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text('Hire ${notification['applicantName']}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You are about to hire this applicant for "${notification['jobTitle']}".',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Send a message with hiring details:',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            TextField(
+              controller: hireMessageController,
+              decoration: InputDecoration(
+                hintText: 'Include details about payment, schedule, location, etc.',
+                border: OutlineInputBorder(),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+              maxLines: 4,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _confirmHiring(notification, hireMessageController.text);
+            },
+            child: Text('Confirm Hiring'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmHiring(Map<String, dynamic> notification, String message) async {
+    try {
+      final dbHelper = DatabaseHelper();
+      
+      // 1. Update application status to "hired"
+      await dbHelper.updateApplicationStatus(notification['id'], 'hired');
+      
+      // 2. Create a notification for the applicant
+      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+      if (user != null) {
+        await dbHelper.createNotification(
+          notification['applicantId'], 
+          user.id!,
+          'hired',
+          'You\'ve been hired for "${notification['jobTitle']}"!',
+          jsonEncode({
+            'jobId': notification['jobId'],
+            'message': message,
+            'hiringDate': DateTime.now().toIso8601String(),
+          }),
+        );
+        
+        // 3. Send a message if provided
+        if (message.isNotEmpty) {
+          await dbHelper.insertMessage({
+            'senderId': user.id,
+            'receiverId': notification['applicantId'],
+            'jobId': notification['jobId'],
+            'message': message,
+            'timestamp': DateTime.now().toIso8601String(),
+            'isRead': 0,
+          });
+        }
+        
+        // 4. Update job status to "assigned" if needed
+        await dbHelper.updateJobStatus(notification['jobId'], 'assigned');
+      }
+      
+      // 5. Show success message and refresh
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${notification['applicantName']} has been hired!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // 6. Refresh notifications
+      setState(() {});
+      
+    } catch (e) {
+      print('Error hiring applicant: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   Widget _buildProfilePreview() {
@@ -2477,38 +2794,56 @@ class _HomeScreenState extends State<HomeScreen> {
         child: BottomNavigationBar(
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
-          backgroundColor: Colors.white,
           selectedItemColor: AppColors.primaryColor,
-          unselectedItemColor: AppColors.textColor.withOpacity(0.5),
+          unselectedItemColor: Colors.grey,
           type: BottomNavigationBarType.fixed,
-          elevation: 0,
           items: [
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home),
               label: 'Home',
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.search_outlined),
-              activeIcon: Icon(Icons.search),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.search),
               label: 'Search',
             ),
             BottomNavigationBarItem(
-              icon: Badge(
-                isLabelVisible: _unreadNotificationsCount > 0,
-                label: Text(_unreadNotificationsCount.toString()),
-                child: const Icon(Icons.notifications_outlined),
+              icon: Stack(
+                children: [
+                  Icon(Icons.chat_bubble_outline),
+                  if (_unreadMessagesCount > 0)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: EdgeInsets.all(1),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        constraints: BoxConstraints(
+                          minWidth: 12,
+                          minHeight: 12,
+                        ),
+                        child: Text(
+                          _unreadMessagesCount > 9 ? '9+' : _unreadMessagesCount.toString(),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                ],
               ),
-              activeIcon: Badge(
-                isLabelVisible: _unreadNotificationsCount > 0,
-                label: Text(_unreadNotificationsCount.toString()),
-                child: const Icon(Icons.notifications),
-              ),
+              label: 'Messages',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.notifications),
               label: 'Notifications',
             ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person),
               label: 'Profile',
             ),
           ],

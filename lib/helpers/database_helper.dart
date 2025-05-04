@@ -70,6 +70,33 @@ class DatabaseHelper {
         FOREIGN KEY (applicantId) REFERENCES users (id)
       )
     ''');
+
+    // Create messages table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        senderId INTEGER NOT NULL,
+        receiverId INTEGER NOT NULL,
+        jobId INTEGER NOT NULL,
+        message TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        isRead INTEGER DEFAULT 0
+      )
+    ''');
+
+    // Create notifications table
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS notifications(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER NOT NULL,
+        senderId INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        message TEXT NOT NULL,
+        details TEXT,
+        createdAt TEXT NOT NULL,
+        isRead INTEGER DEFAULT 0
+      )
+    ''');
   }
 
   Future<void> _createTables(Database db) async {
@@ -118,7 +145,7 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE jobs ADD COLUMN currentImageIndex INTEGER');
         print('Added currentImageIndex column to jobs table');
       } catch (e) {
-        print('Error adding currentImageIndex column: $e');
+        print('Error adding currentImageIndex column to jobs table');
       }
     }
 
@@ -184,16 +211,16 @@ class DatabaseHelper {
     return null;
   }
 
-  Future<User?> getUserById(int id) async {
-    Database db = await database;
-    List<Map<String, dynamic>> maps = await db.query(
+  Future<User?> getUserById(int userId) async {
+    final db = await database;
+    final results = await db.query(
       'users',
       where: 'id = ?',
-      whereArgs: [id],
+      whereArgs: [userId],
     );
-
-    if (maps.isNotEmpty) {
-      return User.fromMap(maps.first);
+    
+    if (results.isNotEmpty) {
+      return User.fromMap(results.first);
     }
     return null;
   }
@@ -312,13 +339,13 @@ class DatabaseHelper {
     return maps.map((map) => Job.fromMap(map)).toList();
   }
 
-  Future<int> updateJobStatus(int id, String status) async {
-    Database db = await database;
+  Future<int> updateJobStatus(int jobId, String status) async {
+    final db = await database;
     return await db.update(
       'jobs',
       {'status': status},
       where: 'id = ?',
-      whereArgs: [id],
+      whereArgs: [jobId],
     );
   }
 
@@ -532,6 +559,184 @@ class DatabaseHelper {
     final resumeDir = Directory('${appDir.path}/resumes');
     if (!await resumeDir.exists()) {
       await resumeDir.create(recursive: true);
+    }
+  }
+
+  // New methods for messaging functionality
+
+  Future<void> createMessagesTable() async {
+    final db = await database;
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        senderId INTEGER NOT NULL,
+        receiverId INTEGER NOT NULL,
+        jobId INTEGER NOT NULL,
+        message TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        isRead INTEGER DEFAULT 0
+      )
+    ''');
+  }
+
+  Future<int> insertMessage(Map<String, dynamic> message) async {
+    final db = await database;
+    
+    // Ensure the messages table exists
+    await createMessagesTable();
+    
+    return await db.insert('messages', message);
+  }
+
+  Future<List<Map<String, dynamic>>> getMessagesByJob(int jobId, int senderId, int receiverId) async {
+    final db = await database;
+    
+    // Ensure the messages table exists
+    await createMessagesTable();
+    
+    return await db.query(
+      'messages',
+      where: 'jobId = ? AND ((senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?))',
+      whereArgs: [jobId, senderId, receiverId, receiverId, senderId],
+      orderBy: 'timestamp ASC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getConversations(int userId) async {
+    final db = await database;
+    
+    try {
+      return db.rawQuery('''
+        SELECT 
+          m.jobId, 
+          j.title AS jobTitle,
+          CASE
+            WHEN m.senderId = ? THEN m.receiverId
+            ELSE m.senderId
+          END AS otherUserId,
+          u.fullName AS otherUserName,
+          u.profileImage AS otherUserImage,
+          MAX(m.timestamp) AS lastMessageTime,
+          (
+            SELECT message FROM messages
+            WHERE jobId = m.jobId
+            AND ((senderId = ? AND receiverId = CASE
+                                                  WHEN m.senderId = ? THEN m.receiverId
+                                                  ELSE m.senderId
+                                                END) 
+                 OR 
+                 (senderId = CASE
+                              WHEN m.senderId = ? THEN m.receiverId
+                              ELSE m.senderId
+                            END 
+                  AND receiverId = ?))
+            ORDER BY timestamp DESC LIMIT 1
+          ) AS lastMessage,
+          (
+            SELECT COUNT(*) FROM messages
+            WHERE jobId = m.jobId
+            AND receiverId = ?
+            AND senderId = CASE
+                            WHEN m.senderId = ? THEN m.receiverId
+                            ELSE m.senderId
+                          END
+            AND isRead = 0
+          ) AS unreadCount
+        FROM messages m
+        JOIN jobs j ON m.jobId = j.id
+        JOIN users u ON (
+          CASE
+            WHEN m.senderId = ? THEN m.receiverId 
+            ELSE m.senderId
+          END = u.id
+        )
+        WHERE m.senderId = ? OR m.receiverId = ?
+        GROUP BY m.jobId, otherUserId
+        ORDER BY lastMessageTime DESC
+      ''', [
+        userId, userId, userId, userId, userId, 
+        userId, userId, userId, userId, userId
+      ]);
+    } catch (e) {
+      print('Error loading conversations: $e');
+      return [];
+    }
+  }
+
+  Future<int> markMessageAsRead(int messageId) async {
+    final db = await database;
+    return await db.update(
+      'messages',
+      {'isRead': 1},
+      where: 'id = ?',
+      whereArgs: [messageId],
+    );
+  }
+
+  Future<int> markAllMessagesAsRead(int jobId, int senderId, int receiverId) async {
+    final db = await database;
+    return await db.update(
+      'messages',
+      {'isRead': 1},
+      where: 'jobId = ? AND senderId = ? AND receiverId = ? AND isRead = 0',
+      whereArgs: [jobId, senderId, receiverId],
+    );
+  }
+
+  Future<int> getUnreadMessagesCount(int userId) async {
+    final db = await database;
+    
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count
+      FROM messages
+      WHERE receiverId = ? AND isRead = 0
+    ''', [userId]);
+    
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // New methods for notifications functionality
+
+  Future<int> createNotification(
+    int userId, 
+    int senderId, 
+    String type, 
+    String message,
+    String details,
+  ) async {
+    final db = await database;
+    
+    return await db.insert('notifications', {
+      'userId': userId,
+      'senderId': senderId,
+      'type': type,
+      'message': message,
+      'details': details,
+      'createdAt': DateTime.now().toIso8601String(),
+      'isRead': 0,
+    });
+  }
+
+  Future<void> ensureNotificationsTableExists() async {
+    try {
+      final db = await database;
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS notifications(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          senderId INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          message TEXT NOT NULL,
+          details TEXT,
+          createdAt TEXT NOT NULL,
+          isRead INTEGER DEFAULT 0,
+          FOREIGN KEY (userId) REFERENCES users (id),
+          FOREIGN KEY (senderId) REFERENCES users (id)
+        )
+      ''');
+      print('Notifications table check completed');
+    } catch (e) {
+      print('Error ensuring notifications table exists: $e');
     }
   }
 }
