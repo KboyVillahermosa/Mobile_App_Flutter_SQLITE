@@ -585,6 +585,9 @@ class DatabaseHelper {
     // Ensure the messages table exists
     await createMessagesTable();
     
+    // Check if we need to modify the messages table to include attachment columns
+    await _ensureMessageTableHasAttachmentColumns();
+    
     return await db.insert('messages', message);
   }
 
@@ -693,6 +696,49 @@ class DatabaseHelper {
     ''', [userId]);
     
     return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // Add this method to delete messages
+  Future<int> deleteMessages(List<int> messageIds) async {
+    final db = await database;
+    return await db.delete(
+      'messages',
+      where: 'id IN (${messageIds.map((_) => '?').join(', ')})',
+      whereArgs: messageIds,
+    );
+  }
+  
+  // Add this method to clear all messages in a chat
+  Future<int> clearChat(int jobId, int user1Id, int user2Id) async {
+    final db = await database;
+    return await db.delete(
+      'messages',
+      where: 'jobId = ? AND ((senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?))',
+      whereArgs: [jobId, user1Id, user2Id, user2Id, user1Id],
+    );
+  }
+  
+  // Add this method to ensure the messages table has attachment columns
+  Future<void> _ensureMessageTableHasAttachmentColumns() async {
+    try {
+      final db = await database;
+      final tableInfo = await db.rawQuery('PRAGMA table_info(messages)');
+      
+      // Check if attachmentPath column exists
+      final hasAttachmentPath = tableInfo.any((column) => column['name'] == 'attachmentPath');
+      if (!hasAttachmentPath) {
+        await db.execute('ALTER TABLE messages ADD COLUMN attachmentPath TEXT');
+      }
+      
+      // Check if attachmentType column exists
+      final hasAttachmentType = tableInfo.any((column) => column['name'] == 'attachmentType');
+      if (!hasAttachmentType) {
+        await db.execute('ALTER TABLE messages ADD COLUMN attachmentType TEXT');
+      }
+      
+    } catch (e) {
+      print('Error ensuring message table has attachment columns: $e');
+    }
   }
 
   // New methods for notifications functionality
