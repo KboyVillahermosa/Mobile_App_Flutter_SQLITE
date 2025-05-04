@@ -34,21 +34,7 @@ class DatabaseHelper {
   }
 
   Future _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE users(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        fullName TEXT NOT NULL,
-        phoneNumber TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        profileImage TEXT,
-        userRole TEXT,
-        ageGroup TEXT,
-        experienceLevel TEXT,
-        services TEXT,
-        interests TEXT,
-        hasCompletedAssessment INTEGER
-      )
-    ''');
+    await _createTables(db);
     
     // Create jobs table
     await db.execute('''
@@ -82,6 +68,26 @@ class DatabaseHelper {
         additionalDetails TEXT,
         FOREIGN KEY (jobId) REFERENCES jobs (id),
         FOREIGN KEY (applicantId) REFERENCES users (id)
+      )
+    ''');
+  }
+
+  Future<void> _createTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fullName TEXT,
+        phoneNumber TEXT,
+        password TEXT,
+        profileImage TEXT,
+        userRole TEXT,
+        ageGroup TEXT,
+        experienceLevel TEXT,
+        services TEXT,
+        interests TEXT,
+        hasCompletedAssessment INTEGER,
+        bio TEXT,
+        achievements TEXT
       )
     ''');
   }
