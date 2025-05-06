@@ -18,6 +18,7 @@ dependencies:
   shared_preferences: ^2.5.3
   intl: ^0.18.1         # For date formatting
   file_picker: ^10.1.2    # Use latest version (significantly newer)
+  url_launcher: ^6.1.12  # For opening GCash app
 
 dev_dependencies:
   flutter_test:

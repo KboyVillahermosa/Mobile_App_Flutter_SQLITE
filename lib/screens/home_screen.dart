@@ -43,6 +43,14 @@ class _HomeScreenState extends State<HomeScreen> {
   int _unreadMessagesCount = 0; // Add this state variable
   Map<int, int> _imageIndexMap = {}; // Maps job.id to current image index
 
+  // Search state variables
+  String _searchQuery = '';
+  List<Job> _filteredJobs = [];
+  RangeValues _priceRange = RangeValues(0, 10000);
+  String _selectedCategory = 'All';
+  String _selectedLocation = 'All';
+  bool _isSearching = false;
+
   // Form controllers - move OUTSIDE of the build method to persist
   final TextEditingController _messageController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
@@ -66,6 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadJobs();
     _updateNotificationCount();
     _updateUnreadMessagesCount();
+    _checkDatabaseHealth(); // Add this line
   }
 
   // Load jobs from database
@@ -92,6 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _jobs = jobs;
           _isLoading = false;
+          // Initialize filtered jobs with all jobs
+          _filteredJobs = List.from(jobs);
         });
       }
     } catch (e) {
@@ -145,6 +156,23 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       print('Error updating unread messages count: $e');
+    }
+  }
+
+  Future<void> _checkDatabaseHealth() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final diagnostics = await dbHelper.getDatabaseDiagnostics();
+      print('Database diagnostics: $diagnostics');
+      
+      // This will help identify if there are any missing tables or columns
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Database health check failed: $e');
     }
   }
 
@@ -1852,39 +1880,502 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSearchTab() {
+    return Column(
+      children: [
+        // Search header with card design
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                spreadRadius: 0,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Search input with button
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey[100],
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search jobs...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            _searchQuery = value;
+                          });
+                        },
+                      ),
+                    ),
+                    // Clear button shows when there's text
+                    if (_searchQuery.isNotEmpty)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () {
+                          setState(() {
+                            _searchQuery = '';
+                            _applySearchFilters();
+                          });
+                        },
+                      ),
+                    // Search button
+                    InkWell(
+                      onTap: () {
+                        _applySearchFilters();
+                        // Close keyboard
+                        FocusScope.of(context).unfocus();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryColor,
+                          borderRadius: const BorderRadius.horizontal(right: Radius.circular(12)),
+                        ),
+                        child: const Text(
+                          'Search',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Category filter with cleaner UI
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Category',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildCategoryChip('All'),
+                        _buildCategoryChip('Gardening'),
+                        _buildCategoryChip('Cleaning'),
+                        _buildCategoryChip('Plumbing'),
+                        _buildCategoryChip('Electrical'),
+                        _buildCategoryChip('Carpentry'),
+                        _buildCategoryChip('Delivery'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Price range with dropdown instead of slider
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Price Range',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _getPriceRangeAsString(),
+                        isExpanded: true,
+                        hint: const Text('Select price range'),
+                        items: [
+                          'Any price',
+                          'Under ₱500',
+                          '₱500 - ₱1,000',
+                          '₱1,000 - ₱2,500',
+                          '₱2,500 - ₱5,000',
+                          '₱5,000 - ₱7,500',
+                          'Over ₱7,500',
+                          'Custom range',  // Add this item
+                        ].map((range) {
+                          return DropdownMenuItem<String>(
+                            value: range,
+                            child: Text(range),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _setPriceRangeFromString(value);
+                              _applySearchFilters();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 20),
+              
+              // Location filter with improved design
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Location',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedLocation,
+                        isExpanded: true,
+                        hint: const Text('Select location'),
+                        items: [
+                          'All',
+                          'Manila',
+                          'Quezon City',
+                          'Cebu City',
+                          'Davao City',
+                          'Makati',
+                          'Pasig',
+                          'Taguig',
+                        ].map((location) {
+                          return DropdownMenuItem<String>(
+                            value: location,
+                            child: Text(location),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() {
+                              _selectedLocation = value;
+                              _applySearchFilters();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Reset button with better styling
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    _resetFilters();
+                    // Show feedback
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Search filters have been reset'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reset All Filters'),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.secondaryColor,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Applied filters indicators
+        if (_hasActiveFilters())
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.grey[100],
+            child: Row(
+              children: [
+                Icon(Icons.filter_list, size: 16, color: AppColors.primaryColor),
+                const SizedBox(width: 8),
+                Text(
+                  'Active filters: ',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                Expanded(
+                  child: Text(_getActiveFiltersText()),
+                ),
+              ],
+            ),
+          ),
+        
+        // Results count and loader
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${_filteredJobs.length} job${_filteredJobs.length == 1 ? '' : 's'} found',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+              if (_isSearching)
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryColor),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        
+        // Results list
+        Expanded(
+          child: _filteredJobs.isEmpty
+              ? _buildNoResultsFound()
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  itemCount: _filteredJobs.length,
+                  itemBuilder: (context, index) {
+                    return _buildJobCard(_filteredJobs[index]);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryChip(String category) {
+    final isSelected = _selectedCategory == category;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: FilterChip(
+        label: Text(category),
+        selected: isSelected,
+        onSelected: (selected) {
+          setState(() {
+            _selectedCategory = category;
+            _applySearchFilters();
+          });
+        },
+        backgroundColor: Colors.grey[200],
+        selectedColor: AppColors.primaryColor.withOpacity(0.2),
+        checkmarkColor: AppColors.primaryColor,
+        labelStyle: TextStyle(
+          color: isSelected ? AppColors.primaryColor : Colors.black87,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNoResultsFound() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.search,
+            Icons.search_off,
             size: 80,
-            color: AppColors.secondaryColor,
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Search',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textColor,
-            ),
+            color: Colors.grey[400],
           ),
           const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Text(
-              'Find services and providers in your area',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: AppColors.textColor.withOpacity(0.7),
-              ),
+          Text(
+            'No results found',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey[700],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Try adjusting your search filters',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey[600],
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _applySearchFilters() {
+    setState(() {
+      _isSearching = true;
+    });
+
+    // Filter jobs based on criteria
+    List<Job> results = _jobs.where((job) {
+      // Filter by search query (in title and description)
+      final matchesQuery = _searchQuery.isEmpty ||
+          job.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          job.description.toLowerCase().contains(_searchQuery.toLowerCase());
+
+      // Filter by category
+      final matchesCategory = _selectedCategory == 'All' ||
+          job.category?.toLowerCase() == _selectedCategory.toLowerCase();
+
+      // Filter by price range
+      final matchesPrice = job.budget >= _priceRange.start && 
+                           job.budget <= _priceRange.end;
+
+      // Filter by location
+      final matchesLocation = _selectedLocation == 'All' ||
+          job.location.toLowerCase().contains(_selectedLocation.toLowerCase());
+
+      return matchesQuery && matchesCategory && matchesPrice && matchesLocation;
+    }).toList();
+
+    // Sort results (newest first)
+    results.sort((a, b) => b.dateTime.compareTo(a.dateTime));
+
+    setState(() {
+      _filteredJobs = results;
+      _isSearching = false;
+    });
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _searchQuery = '';
+      _selectedCategory = 'All';
+      _priceRange = RangeValues(0, 10000);
+      _selectedLocation = 'All';
+      _filteredJobs = List.from(_jobs);
+    });
+  }
+
+  // Helper to get price range as string
+  String _getPriceRangeAsString() {
+    if (_priceRange.start == 0 && _priceRange.end == 10000) {
+      return 'Any price';
+    } else if (_priceRange.start == 0 && _priceRange.end == 500) {
+      return 'Under ₱500';
+    } else if (_priceRange.start == 500 && _priceRange.end == 1000) {
+      return '₱500 - ₱1,000';
+    } else if (_priceRange.start == 1000 && _priceRange.end == 2500) {
+      return '₱1,000 - ₱2,500';
+    } else if (_priceRange.start == 2500 && _priceRange.end == 5000) {
+      return '₱2,500 - ₱5,000';
+    } else if (_priceRange.start == 5000 && _priceRange.end == 7500) {
+      return '₱5,000 - ₱7,500';
+    } else if (_priceRange.start == 7500 && _priceRange.end == 10000) {
+      return 'Over ₱7,500';
+    }
+    return 'Custom range';
+  }
+
+  // Helper to set price range from string
+  void _setPriceRangeFromString(String range) {
+    switch (range) {
+      case 'Any price':
+        _priceRange = RangeValues(0, 10000);
+        break;
+      case 'Under ₱500':
+        _priceRange = RangeValues(0, 500);
+        break;
+      case '₱500 - ₱1,000':
+        _priceRange = RangeValues(500, 1000);
+        break;
+      case '₱1,000 - ₱2,500':
+        _priceRange = RangeValues(1000, 2500);
+        break;
+      case '₱2,500 - ₱5,000':
+        _priceRange = RangeValues(2500, 5000);
+        break;
+      case '₱5,000 - ₱7,500':
+        _priceRange = RangeValues(5000, 7500);
+        break;
+      case 'Over ₱7,500':
+        _priceRange = RangeValues(7500, 10000);
+        break;
+    }
+  }
+
+  // Check if any filters are active
+  bool _hasActiveFilters() {
+    return _searchQuery.isNotEmpty || 
+           _selectedCategory != 'All' || 
+           _selectedLocation != 'All' ||
+           _priceRange.start > 0 || 
+           _priceRange.end < 10000;
+  }
+
+  // Get a text description of active filters
+  String _getActiveFiltersText() {
+    List<String> filters = [];
+    
+    if (_searchQuery.isNotEmpty) {
+      filters.add('"${_searchQuery}"');
+    }
+    
+    if (_selectedCategory != 'All') {
+      filters.add(_selectedCategory);
+    }
+    
+    if (_selectedLocation != 'All') {
+      filters.add(_selectedLocation);
+    }
+    
+    if (_priceRange.start > 0 || _priceRange.end < 10000) {
+      filters.add(_getPriceRangeAsString());
+    }
+    
+    return filters.join(', ');
   }
 
   Widget _buildNotificationsTab() {
@@ -2096,7 +2587,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icons.calendar_today_outlined,
                     ),
                   
-                  // Tools & Transportation
                   Row(
                     children: [
                       if (assessmentDetails['hasTools'] == 'true')
@@ -2189,9 +2679,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   TextButton.icon(
                     icon: Icon(Icons.description),
                     label: Text('Documents'),
-                    onPressed: assessmentDetails != null 
-                      ? () => _viewApplicationDocuments(assessmentDetails!) 
-                      : null,
+                    onPressed: () => _viewApplicationDocuments(assessmentDetails),
                   ),
                 TextButton.icon(
                   icon: Icon(Icons.message_outlined),
@@ -2391,7 +2879,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _viewApplicationDocuments(Map<String, dynamic> assessmentDetails) {
+  void _viewApplicationDocuments(Map<String, dynamic>? assessmentDetails) {
+    if (assessmentDetails == null) return;
+    
     final resumePath = assessmentDetails['resumePath'];
     final bioDataPath = assessmentDetails['bioDataImagePath'];
     

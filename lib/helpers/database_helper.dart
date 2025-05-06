@@ -785,4 +785,40 @@ class DatabaseHelper {
       print('Error ensuring notifications table exists: $e');
     }
   }
+
+  Future<Map<String, dynamic>> getDatabaseDiagnostics() async {
+    final db = await database;
+    final diagnostics = <String, dynamic>{};
+    
+    try {
+      // Check tables
+      final tables = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
+      diagnostics['tables'] = tables.map((t) => t['name']).toList();
+      
+      // Check columns for each important table
+      final tablesList = ['users', 'jobs', 'applications', 'messages', 'notifications'];
+      diagnostics['columns'] = {};
+      
+      for (final table in tablesList) {
+        if (diagnostics['tables']!.contains(table)) {
+          final columns = await db.rawQuery('PRAGMA table_info($table)');
+          diagnostics['columns'][table] = columns.map((c) => c['name']).toList();
+        }
+      }
+      
+      // Count records in each table
+      diagnostics['recordCounts'] = {};
+      for (final table in tablesList) {
+        if (diagnostics['tables']!.contains(table)) {
+          final count = await db.rawQuery('SELECT COUNT(*) as count FROM $table');
+          diagnostics['recordCounts'][table] = Sqflite.firstIntValue(count) ?? 0;
+        }
+      }
+      
+      return diagnostics;
+    } catch (e) {
+      print('Error getting database diagnostics: $e');
+      return {'error': e.toString()};
+    }
+  }
 }

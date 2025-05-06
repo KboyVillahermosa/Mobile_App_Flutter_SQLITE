@@ -14,6 +14,7 @@ class Job {
   String? uploaderName;
   String? uploaderImage;
   int? currentImageIndex; // Add this property to track the current image index
+  String? category; // Add this field
 
   Job({
     this.id,
@@ -29,6 +30,7 @@ class Job {
     this.uploaderName,
     this.uploaderImage,
     this.currentImageIndex = 0, // Default to first image
+    this.category, // Initialize category
   }) : this.createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toMap() {
@@ -46,6 +48,7 @@ class Job {
       'uploaderName': uploaderName ?? '',
       'uploaderImage': uploaderImage ?? '',
       'currentImageIndex': currentImageIndex,
+      'category': category ?? '', // Add category to map
     };
   }
 
@@ -76,6 +79,7 @@ class Job {
       uploaderName: map['uploaderName'],
       uploaderImage: map['uploaderImage'],
       currentImageIndex: map['currentImageIndex'], // Parse currentImageIndex from the map
+      category: map['category'], // Parse category from the map
     );
   }
 }
