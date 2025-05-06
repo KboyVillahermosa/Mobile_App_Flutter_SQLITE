@@ -1,9 +1,25 @@
 import 'package:flutter/material.dart';
-import 'screens/login_screen.dart';
+import 'package:flutter/services.dart';
+import 'screens/splash_screen.dart';
 import 'helpers/database_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Set preferred orientations
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+  
+  // Set system UI overlay style
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+  
   await DatabaseHelper().forceUpgradeDatabaseSchema();
   runApp(const MyApp());
 }
@@ -14,13 +30,15 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Auth App',
-      debugShowCheckedModeBanner: false,
+      title: 'ServiceYou',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        primaryColor: const Color(0xFF06D6A0),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF06D6A0)),
         useMaterial3: true,
+        fontFamily: 'Poppins', // Make sure this font is added to your pubspec.yaml
       ),
-      home: const LoginScreen(),
+      debugShowCheckedModeBanner: false,
+      home: const SplashScreen(),
     );
   }
 }
