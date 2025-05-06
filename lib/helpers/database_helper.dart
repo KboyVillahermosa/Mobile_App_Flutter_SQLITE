@@ -285,6 +285,62 @@ class DatabaseHelper {
     );
   }
 
+  Future<int> updateUserSkills(int userId, List<String> skills) async {
+    final db = await database;
+    return await db.update(
+      'users',
+      {'services': jsonEncode(skills)},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<int> markAssessmentComplete(int userId) async {
+    final db = await database;
+    return await db.update(
+      'users',
+      {'hasCompletedAssessment': 1},
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+  }
+
+  Future<bool> hasCompletedAssessment(int userId) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      columns: ['hasCompletedAssessment'],
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    
+    if (result.isNotEmpty) {
+      return (result.first['hasCompletedAssessment'] as int?) == 1;
+    }
+    return false;
+  }
+
+  Future<List<String>> getUserSkills(int userId) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      columns: ['services'],
+      where: 'id = ?',
+      whereArgs: [userId],
+    );
+    
+    if (result.isNotEmpty && result.first['services'] != null) {
+      try {
+        final List<dynamic> decoded = jsonDecode(result.first['services'] as String);
+        return decoded.map((skill) => skill.toString()).toList();
+      } catch (e) {
+        print('Error decoding skills: $e');
+        return [];
+      }
+    }
+    return [];
+  }
+
   Future<String> getDatabasePath() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'auth.db');

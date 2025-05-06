@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
+import '../helpers/database_helper.dart';
+import '../models/user.dart';
+import 'skills_assessment_screen.dart';
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -42,16 +45,56 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         if (_otpController.text == widget.generatedOtp) {
           if (!mounted) return;
           
-          // Navigate to home screen on successful verification
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(
-                phoneNumber: widget.phoneNumber,
+          // Get user from database 
+          final dbHelper = DatabaseHelper();
+          final user = await dbHelper.getUserByPhone(widget.phoneNumber);
+          
+          if (user != null) {
+            // Check if assessment is required
+            final hasCompletedAssessment = await dbHelper.hasCompletedAssessment(user.id!);
+            
+            if (!hasCompletedAssessment) {
+              // Navigate to skills assessment
+              if (!mounted) return;
+              
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SkillsAssessment(
+                    user: user,
+                    isEditing: false,
+                  ),
+                ),
+                (route) => false,
+              );
+            } else {
+              // Navigate to home screen if assessment already completed
+              if (!mounted) return;
+              
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(
+                    phoneNumber: widget.phoneNumber,
+                  ),
+                ),
+                (route) => false,
+              );
+            }
+          } else {
+            // User not found (unlikely case)
+            if (!mounted) return;
+            
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  phoneNumber: widget.phoneNumber,
+                ),
               ),
-            ),
-            (route) => false,
-          );
+              (route) => false,
+            );
+          }
         } else {
           if (!mounted) return;
           
@@ -62,10 +105,21 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
             ),
           );
         }
+      } catch (e) {
+        if (!mounted) return;
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       } finally {
-        setState(() {
-          _isVerifying = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isVerifying = false;
+          });
+        }
       }
     }
   }

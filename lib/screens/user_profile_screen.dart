@@ -8,6 +8,7 @@ import 'edit_profile_screen.dart';
 import 'change_password_screen.dart';
 import 'application_history_screen.dart';
 import 'achievements_editor_screen.dart';
+import 'skills_assessment_screen.dart'; // Add this import
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -249,6 +250,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               
                               // Achievements section
                               _buildAchievementsSection(),
+                              
+                              // Skills section
+                              _buildSkillsSection(),
                               
                               const SizedBox(height: 40),
                             ],
@@ -1208,6 +1212,65 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             endIndent: 20,
           ),
       ],
+    );
+  }
+
+  Widget _buildSkillsSection() {
+    return FutureBuilder<List<String>>(
+      future: DatabaseHelper().getUserSkills(_user!.id!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final skills = snapshot.data ?? [];
+        
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Skills',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit'),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SkillsAssessment(
+                          user: _user!,
+                          isEditing: true,
+                        ),
+                      ),
+                    ).then((_) => setState(() {})); // Refresh after returning
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            skills.isEmpty
+                ? const Text('No skills added yet')
+                : Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: skills.map((skill) {
+                      return Chip(
+                        label: Text(skill),
+                        backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      );
+                    }).toList(),
+                  ),
+          ],
+        );
+      },
     );
   }
 }

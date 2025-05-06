@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import '../services/image_picker_service.dart';
 import 'message_screen.dart';
 import 'conversations_screen.dart'; // Add this import for ConversationsScreen
+import 'skills_assessment_screen.dart'; // Add this import for SkillsAssessment
 
 // Color palette definition - consistent with other screens
 class AppColors {
@@ -75,6 +76,37 @@ class _HomeScreenState extends State<HomeScreen> {
     _updateNotificationCount();
     _updateUnreadMessagesCount();
     _checkDatabaseHealth(); // Add this line
+    _checkSkillsAssessment(); // Call this after user authentication is confirmed
+  }
+
+  // Fix this method in your home screen class
+  Future<void> _checkSkillsAssessment() async {
+    if (widget.phoneNumber == null) {
+      return; // No user logged in, skip assessment check
+    }
+    
+    try {
+      final dbHelper = DatabaseHelper();
+      final user = await dbHelper.getUserByPhone(widget.phoneNumber!);
+      
+      if (user != null) {
+        final hasCompleted = await dbHelper.hasCompletedAssessment(user.id!);
+        
+        if (!hasCompleted && mounted) {
+          // Redirect to skills assessment
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => SkillsAssessment(
+                user: user,
+                isEditing: false,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error checking skills assessment: $e');
+    }
   }
 
   // Load jobs from database
@@ -472,7 +504,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 16),
                 
-                // Job details in a row with icons
+                // Budget and Location row
                 Row(
                   children: [
                     // Budget
