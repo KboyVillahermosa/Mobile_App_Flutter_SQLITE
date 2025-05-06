@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'login_screen.dart';
+import 'onboarding_screen.dart'; // Add this import
 import 'dart:math' as math;
 
 class SplashScreen extends StatefulWidget {
@@ -42,11 +43,11 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     // Start the animation
     _animationController.forward();
     
-    // Navigate to login screen after delay
+    // Navigate to onboarding screen after delay
     Timer(const Duration(seconds: 3), () {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
+          builder: (context) => const OnboardingScreen(),
         ),
       );
     });
