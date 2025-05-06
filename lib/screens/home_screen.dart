@@ -2671,41 +2671,53 @@ class _HomeScreenState extends State<HomeScreen> {
           // Action buttons
           Padding(
             padding: const EdgeInsets.all(8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Wrap(
+              spacing: 4, // horizontal space between buttons
+              runSpacing: 8, // vertical space between rows
+              alignment: WrapAlignment.end,
               children: [
                 if (assessmentDetails != null && 
                     (assessmentDetails['resumePath'] != null || assessmentDetails['bioDataImagePath'] != null))
                   TextButton.icon(
-                    icon: Icon(Icons.description),
-                    label: Text('Documents'),
+                    icon: Icon(Icons.description, size: 20),
+                    label: Text('Documents', style: TextStyle(fontSize: 13)),
                     onPressed: () => _viewApplicationDocuments(assessmentDetails),
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
                   ),
                 TextButton.icon(
-                  icon: Icon(Icons.message_outlined),
-                  label: Text('Message'),
+                  icon: Icon(Icons.message_outlined, size: 20),
+                  label: Text('Message', style: TextStyle(fontSize: 13)),
                   onPressed: () => _openMessageDialog(notification),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
                 ),
                 TextButton(
                   onPressed: () => _viewApplicantProfile(notification),
-                  child: Text('View Profile'),
+                  child: Text('View Profile', style: TextStyle(fontSize: 13)),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
                 ),
-                const SizedBox(width: 8),
                 notification['status'] == 'hired' ? 
                   OutlinedButton.icon(
-                    icon: Icon(Icons.check_circle, color: Colors.green),
-                    label: Text('Hired', style: TextStyle(color: Colors.green)),
+                    icon: Icon(Icons.check_circle, color: Colors.green, size: 18),
+                    label: Text('Hired', style: TextStyle(color: Colors.green, fontSize: 13)),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: Colors.green),
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     ),
                     onPressed: null,
                   ) :
                   ElevatedButton.icon(
-                    icon: Icon(Icons.handshake_outlined),
-                    label: Text('Hire'),
+                    icon: Icon(Icons.handshake_outlined, size: 18),
+                    label: Text('Hire', style: TextStyle(fontSize: 13)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryColor,
                       foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     ),
                     onPressed: () => _hireApplicant(notification),
                   ),
