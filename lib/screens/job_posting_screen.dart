@@ -140,12 +140,21 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
         // Save images to app directory and get paths
         List<String> savedImagePaths = [];
         for (var image in _selectedImages) {
-          String fileName = 'job_image_${DateTime.now().millisecondsSinceEpoch}_${savedImagePaths.length}.jpg';
-          Directory appDocDir = await getApplicationDocumentsDirectory();
-          String savedPath = '${appDocDir.path}/$fileName';
-          
-          await image.copy(savedPath);
-          savedImagePaths.add(savedPath);
+          try {
+            String fileName = 'job_image_${DateTime.now().millisecondsSinceEpoch}_${savedImagePaths.length}.jpg';
+            Directory appDocDir = await getApplicationDocumentsDirectory();
+            String savedPath = '${appDocDir.path}/$fileName';
+            
+            // Read source file as bytes and write to destination instead of using copy
+            final bytes = await image.readAsBytes();
+            final newFile = File(savedPath);
+            await newFile.writeAsBytes(bytes);
+            
+            savedImagePaths.add(savedPath);
+          } catch (e) {
+            print('Error saving image: $e');
+            // Continue with other images even if one fails
+          }
         }
         
         // Create job object
@@ -157,6 +166,7 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
           location: _locationController.text,
           dateTime: dateTime,
           imagePaths: savedImagePaths,
+          category: 'General', // Add a default category
         );
         
         // Insert job into database

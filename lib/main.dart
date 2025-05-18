@@ -20,7 +20,10 @@ void main() async {
     ),
   );
   
-  await DatabaseHelper().forceUpgradeDatabaseSchema();
+  // Initialize database and force schema upgrade
+  final dbHelper = DatabaseHelper();
+  await dbHelper.forceUpgradeDatabaseSchema();
+  
   runApp(const MyApp());
 }
 

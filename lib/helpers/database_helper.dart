@@ -27,7 +27,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       path,
-      version: 7, // Increment version to trigger migration
+      version: 8, // Increment version to trigger migration
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -51,7 +51,8 @@ class DatabaseHelper {
         createdAt TEXT,
         uploaderName TEXT,
         uploaderImage TEXT,
-        currentImageIndex INTEGER
+        currentImageIndex INTEGER,
+        category TEXT
       )
     ''');
 
@@ -188,6 +189,15 @@ class DatabaseHelper {
         }
       } catch (e) {
         print('Error updating applications schema: $e');
+      }
+    }
+
+    if (oldVersion < 8) { // Use the next version number
+      try {
+        await db.execute('ALTER TABLE jobs ADD COLUMN category TEXT');
+        print('Added category column to jobs table');
+      } catch (e) {
+        print('Error adding category column (may already exist): $e');
       }
     }
   }
@@ -571,7 +581,8 @@ class DatabaseHelper {
       // Add missing columns if they don't exist
       await db.execute('ALTER TABLE jobs ADD COLUMN uploaderName TEXT');
       await db.execute('ALTER TABLE jobs ADD COLUMN uploaderImage TEXT');
-      print('Manually added uploaderName and uploaderImage columns');
+      await db.execute('ALTER TABLE jobs ADD COLUMN category TEXT'); // Add this line
+      print('Manually added columns to jobs table');
     } catch (e) {
       print('Error adding columns (may already exist): $e');
     }
