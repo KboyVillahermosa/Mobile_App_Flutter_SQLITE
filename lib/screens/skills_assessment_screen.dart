@@ -485,12 +485,15 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                         child: const Icon(Icons.add_circle_outline, color: Color(0xFF06D6A0)),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        'Add Your Custom Skills',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF303030),
+                      // Wrap text with Expanded to prevent overflow
+                      const Expanded(
+                        child: Text(
+                          'Add Your Custom Skills',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF303030),
+                          ),
                         ),
                       ),
                     ],
@@ -574,15 +577,17 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                           child: const Icon(Icons.list_alt, color: Color(0xFF06D6A0)),
                         ),
                         const SizedBox(width: 12),
-                        const Text(
-                          'Your Selected Skills',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF303030),
+                        // Wrap title with Expanded to prevent overflow
+                        const Expanded(
+                          child: Text(
+                            'Your Selected Skills',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF303030),
+                            ),
                           ),
                         ),
-                        const Spacer(),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
@@ -665,12 +670,15 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                         child: const Icon(Icons.check_circle_outline, color: Color(0xFF06D6A0), size: 24),
                       ),
                       const SizedBox(width: 16),
-                      const Text(
-                        'Review Your Professional Skills',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF303030),
+                      // Wrap title with Expanded to prevent overflow
+                      const Expanded(
+                        child: Text(
+                          'Review Your Professional Skills',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF303030),
+                          ),
                         ),
                       ),
                     ],
