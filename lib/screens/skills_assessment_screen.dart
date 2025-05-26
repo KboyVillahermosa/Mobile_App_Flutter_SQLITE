@@ -180,19 +180,36 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: Text(widget.isEditing ? 'Edit Skills' : 'Professional Skills'),
+        title: Text(
+          widget.isEditing ? 'Edit Skills' : 'Professional Skills',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
         automaticallyImplyLeading: widget.isEditing,
         backgroundColor: const Color(0xFF06D6A0),
         elevation: 0,
         centerTitle: true,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+        ),
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: Color(0xFF06D6A0)))
         : Column(
             children: [
-              // Progress indicator
+              // Enhanced Progress indicator
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.1),
+                      spreadRadius: 1,
+                      blurRadius: 6,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -202,60 +219,75 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                         Text(
                           _steps[_currentStep],
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF06D6A0),
+                            letterSpacing: 0.3,
                           ),
                         ),
-                        Text(
-                          'Step ${_currentStep + 1} of ${_steps.length}',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF06D6A0).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Step ${_currentStep + 1}/${_steps.length}',
+                            style: const TextStyle(
+                              color: Color(0xFF06D6A0),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: (_currentStep + 1) / _steps.length,
-                      backgroundColor: Colors.grey[300],
-                      valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF06D6A0)),
-                      minHeight: 5,
-                      borderRadius: BorderRadius.circular(5),
+                    const SizedBox(height: 12),
+                    // Custom stepped progress indicator
+                    Row(
+                      children: List.generate(_steps.length, (index) {
+                        final isActive = index <= _currentStep;
+                        return Expanded(
+                          child: Container(
+                            height: 6,
+                            margin: EdgeInsets.only(right: index < _steps.length - 1 ? 4 : 0),
+                            decoration: BoxDecoration(
+                              color: isActive 
+                                ? const Color(0xFF06D6A0) 
+                                : const Color(0xFFE0E0E0),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                        );
+                      }),
                     ),
                   ],
                 ),
               ),
 
-              // Main content
+              // Main content with improved animation
               Expanded(
                 child: PageView(
                   controller: _pageController,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    // STEP 1: Choose skills from categories
                     _buildCategoriesPage(),
-                    
-                    // STEP 2: Add custom skills
                     _buildCustomSkillsPage(),
-                    
-                    // STEP 3: Review and confirm
                     _buildReviewPage(),
                   ],
                 ),
               ),
 
-              // Bottom navigation
+              // Enhanced Bottom navigation
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.grey.withOpacity(0.2),
+                      color: Colors.grey.withOpacity(0.15),
                       spreadRadius: 1,
-                      blurRadius: 5,
+                      blurRadius: 10,
                       offset: const Offset(0, -2),
                     ),
                   ],
@@ -271,17 +303,20 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                           foregroundColor: Colors.grey[800],
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                             side: BorderSide(color: Colors.grey[300]!),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(Icons.arrow_back, size: 16),
                             const SizedBox(width: 8),
-                            Text(_currentStep > 0 ? 'Back' : 'Cancel'),
+                            Text(
+                              _currentStep > 0 ? 'Back' : 'Cancel',
+                              style: const TextStyle(fontWeight: FontWeight.w600),
+                            ),
                           ],
                         ),
                       )
@@ -290,28 +325,36 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                     
                     ElevatedButton(
                       onPressed: _selectedSkills.isEmpty && _currentStep == _steps.length - 1 
-                        ? null // Disable if no skills selected on final step
+                        ? null 
                         : _goToNextPage,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF06D6A0),
                         foregroundColor: Colors.white,
                         disabledBackgroundColor: Colors.grey[400],
-                        elevation: 0,
+                        elevation: 2,
+                        shadowColor: const Color(0xFF06D6A0).withOpacity(0.3),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(_currentStep < _steps.length - 1 ? 'Continue' : 'Complete'),
-                          const SizedBox(width: 8),
+                          Text(
+                            _currentStep < _steps.length - 1 ? 'Continue' : 'Complete',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
                           Icon(
                             _currentStep < _steps.length - 1 
                               ? Icons.arrow_forward 
                               : Icons.check_circle,
-                            size: 16,
+                            size: 18,
                           ),
                         ],
                       ),
@@ -326,14 +369,14 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
 
   Widget _buildCategoriesPage() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: ListView(
         children: [
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
+            padding: EdgeInsets.only(bottom: 16, left: 4),
             child: Text(
               'Select your professional skills',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: Color(0xFF424242)),
             ),
           ),
           ..._skillCategories.entries.map((entry) {
@@ -342,54 +385,65 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
             final icon = _categoryIcons[category] ?? Icons.label;
             
             return Card(
-              margin: const EdgeInsets.only(bottom: 16),
-              elevation: 2,
+              margin: const EdgeInsets.only(bottom: 18),
+              elevation: 0.5,
+              shadowColor: Colors.black38,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.shade200),
               ),
               child: Theme(
                 data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
                 child: ExpansionTile(
                   leading: CircleAvatar(
                     backgroundColor: const Color(0xFF06D6A0).withOpacity(0.1),
-                    child: Icon(icon, color: const Color(0xFF06D6A0)),
+                    child: Icon(icon, color: const Color(0xFF06D6A0), size: 22),
                   ),
                   title: Text(
                     category,
                     style: const TextStyle(
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w600,
                       fontSize: 16,
+                      color: Color(0xFF303030),
                     ),
                   ),
-                  childrenPadding: const EdgeInsets.all(16),
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  childrenPadding: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
                   children: [
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 10,
+                      runSpacing: 10,
                       children: skills.map((skill) {
                         final isSelected = _selectedSkills.contains(skill);
-                        return FilterChip(
-                          label: Text(skill),
-                          selected: isSelected,
-                          showCheckmark: false,
-                          avatar: isSelected 
-                            ? const Icon(Icons.check, size: 16, color: Colors.white)
-                            : null,
-                          backgroundColor: Colors.grey[200],
-                          selectedColor: const Color(0xFF06D6A0),
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : Colors.black87,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          child: FilterChip(
+                            label: Text(skill),
+                            selected: isSelected,
+                            showCheckmark: false,
+                            avatar: isSelected 
+                              ? const Icon(Icons.check, size: 16, color: Colors.white)
+                              : null,
+                            backgroundColor: Colors.grey[100],
+                            selectedColor: const Color(0xFF06D6A0),
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedSkills.add(skill);
+                                } else {
+                                  _selectedSkills.remove(skill);
+                                }
+                              });
+                            },
                           ),
-                          onSelected: (selected) {
-                            setState(() {
-                              if (selected) {
-                                _selectedSkills.add(skill);
-                              } else {
-                                _selectedSkills.remove(skill);
-                              }
-                            });
-                          },
                         );
                       }).toList(),
                     ),
@@ -405,32 +459,48 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
 
   Widget _buildCustomSkillsPage() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: ListView(
         children: [
           Card(
-            elevation: 2,
+            elevation: 0.5,
+            shadowColor: Colors.black38,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.grey.shade200),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Add Your Custom Skills',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Don\'t see your skills in our list? Add your own specialized skills here.',
-                    style: TextStyle(color: Colors.grey),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF06D6A0).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.add_circle_outline, color: Color(0xFF06D6A0)),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Add Your Custom Skills',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF303030),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
+                  const Text(
+                    'Don\'t see your skills in our list? Add your own specialized skills here.',
+                    style: TextStyle(color: Color(0xFF757575), fontSize: 14),
+                  ),
+                  const SizedBox(height: 20),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -440,27 +510,34 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                           decoration: InputDecoration(
                             labelText: 'Enter a custom skill',
                             hintText: 'e.g., Machine Learning',
+                            floatingLabelBehavior: FloatingLabelBehavior.never,
+                            filled: true,
+                            fillColor: Colors.grey[50],
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: Colors.grey.shade300),
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(color: Color(0xFF06D6A0), width: 2),
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF06D6A0), width: 1.5),
                             ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                           ),
                           onSubmitted: (_) => _addCustomSkill(),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       ElevatedButton(
                         onPressed: _addCustomSkill,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF06D6A0),
                           foregroundColor: Colors.white,
+                          elevation: 2,
+                          shadowColor: const Color(0xFF06D6A0).withOpacity(0.3),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          padding: const EdgeInsets.all(15),
+                          padding: const EdgeInsets.all(16),
                           minimumSize: const Size(50, 58),
                         ),
                         child: const Icon(Icons.add),
@@ -475,50 +552,73 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
           if (_selectedSkills.isNotEmpty) ...[
             const SizedBox(height: 24),
             Card(
-              elevation: 2,
+              elevation: 0.5,
+              shadowColor: Colors.black38,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(color: Colors.grey.shade200),
               ),
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.list, color: Color(0xFF06D6A0)),
-                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF06D6A0).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.list_alt, color: Color(0xFF06D6A0)),
+                        ),
+                        const SizedBox(width: 12),
                         const Text(
                           'Your Selected Skills',
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF303030),
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          '${_selectedSkills.length} selected',
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF06D6A0).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${_selectedSkills.length} selected',
+                            style: const TextStyle(
+                              color: Color(0xFF06D6A0),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     Wrap(
-                      spacing: 8.0,
-                      runSpacing: 8.0,
+                      spacing: 10.0,
+                      runSpacing: 10.0,
                       children: _selectedSkills.map((skill) {
                         return Chip(
                           label: Text(skill),
-                          labelStyle: const TextStyle(fontWeight: FontWeight.w500),
-                          backgroundColor: const Color(0xFF06D6A0).withOpacity(0.1),
+                          labelStyle: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF06D6A0),
+                          ),
+                          backgroundColor: const Color(0xFF06D6A0).withOpacity(0.08),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                           side: BorderSide.none,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(30),
                           ),
                           deleteIconColor: const Color(0xFF06D6A0),
+                          deleteButtonTooltipMessage: "Remove skill",
                           onDeleted: () {
                             setState(() {
                               _selectedSkills.remove(skill);
@@ -539,36 +639,53 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
 
   Widget _buildReviewPage() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: ListView(
         children: [
           Card(
-            elevation: 2,
+            elevation: 0.5,
+            shadowColor: Colors.black38,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.grey.shade200),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.check_circle, color: Color(0xFF06D6A0)),
-                      SizedBox(width: 8),
-                      Text(
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF06D6A0).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.check_circle_outline, color: Color(0xFF06D6A0), size: 24),
+                      ),
+                      const SizedBox(width: 16),
+                      const Text(
                         'Review Your Professional Skills',
                         style: TextStyle(
                           fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF303030),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'These skills will be visible on your profile and help match you with relevant opportunities.',
-                    style: TextStyle(color: Colors.grey),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF06D6A0).withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'These skills will be visible on your profile and help match you with relevant opportunities.',
+                      style: TextStyle(color: Color(0xFF424242), height: 1.4),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   if (_selectedSkills.isEmpty)
@@ -576,17 +693,17 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: Colors.red[50],
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.red[200]!),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.warning, color: Colors.red[400]),
-                          const SizedBox(width: 8),
+                          Icon(Icons.warning_amber_rounded, color: Colors.red[400], size: 24),
+                          const SizedBox(width: 12),
                           const Expanded(
                             child: Text(
                               'No skills selected. Please go back and select at least one skill.',
-                              style: TextStyle(color: Colors.red),
+                              style: TextStyle(color: Colors.red, height: 1.4),
                             ),
                           ),
                         ],
@@ -596,36 +713,51 @@ class _SkillsAssessmentState extends State<SkillsAssessment> with SingleTickerPr
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: _selectedSkills.map((skill) {
-                            return Chip(
-                              label: Text(skill),
-                              backgroundColor: const Color(0xFF06D6A0).withOpacity(0.1),
-                              labelStyle: const TextStyle(fontWeight: FontWeight.w500),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            );
-                          }).toList(),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[50],
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: Wrap(
+                            spacing: 10.0,
+                            runSpacing: 10.0,
+                            children: _selectedSkills.map((skill) {
+                              return Chip(
+                                label: Text(skill),
+                                backgroundColor: const Color(0xFF06D6A0).withOpacity(0.08),
+                                labelStyle: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF06D6A0),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                         const SizedBox(height: 24),
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: Colors.blue[50],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue[200]!),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.blue[100]!),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.info, color: Colors.blue[400]),
-                              const SizedBox(width: 8),
+                              Icon(Icons.info_outline, color: Colors.blue[600], size: 24),
+                              const SizedBox(width: 12),
                               const Expanded(
                                 child: Text(
                                   'You can edit your skills at any time from your profile settings.',
-                                  style: TextStyle(color: Color(0xFF1976D2)), // Fixed blue shade 700
+                                  style: TextStyle(
+                                    color: Color(0xFF1976D2),
+                                    height: 1.4,
+                                  ),
                                 ),
                               ),
                             ],

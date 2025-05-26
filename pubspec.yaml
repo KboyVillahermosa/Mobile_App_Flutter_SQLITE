@@ -14,11 +14,15 @@ dependencies:
   path: ^1.8.3
   random_string: ^2.3.1
   cupertino_icons: ^1.0.2
-  image_picker: ^1.0.4  # For selecting images
+  image_picker: ^1.0.4
   shared_preferences: ^2.5.3
-  intl: ^0.18.1         # For date formatting
-  file_picker: ^10.1.2    # Use latest version (significantly newer)
-  url_launcher: ^6.1.12  # For opening GCash app
+  intl: ^0.18.1
+  file_picker: ^10.1.2
+  url_launcher: ^6.1.12
+  supabase_flutter: 1.10.19
+
+dependency_overrides:
+  sign_in_with_apple: ^7.0.0
 
 dev_dependencies:
   flutter_test:
