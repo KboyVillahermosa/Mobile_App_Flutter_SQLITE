@@ -465,7 +465,31 @@ class DatabaseHelper {
         applicationData['additionalDetails'] = jsonEncode(applicationData['additionalDetails']);
       }
       
-      return await db.insert('applications', applicationData);
+      // Insert the application and get the application ID
+      final applicationId = await db.insert('applications', applicationData);
+      
+      // Create a notification for the job owner
+      // First, get the job to find the owner
+      final job = await getJobById(application.jobId);
+      if (job != null) {
+        // Get applicant details for notification message
+        final applicant = await getUserById(application.applicantId);
+        
+        // Create notification for job owner
+        await createNotification(
+          job.userId,  // Job owner's user ID
+          application.applicantId,  // Applicant's user ID
+          'application',  // Notification type
+          '${applicant?.fullName ?? "Someone"} applied for your job "${job.title}"',  // Message
+          jsonEncode({
+            'jobId': job.id,
+            'applicationId': applicationId,
+            'applicantName': applicant?.fullName
+          }),  // Additional details as JSON
+        );
+      }
+      
+      return applicationId;
     } catch (e) {
       print('Error inserting job application: $e');
       rethrow;
@@ -887,5 +911,36 @@ class DatabaseHelper {
       print('Error getting database diagnostics: $e');
       return {'error': e.toString()};
     }
+  }
+
+  // Get user by job ID (to find job owner)
+  Future<User?> getUserByJobId(int jobId) async {
+    final db = await database;
+    
+    // Get the job to find the uploaderId
+    final jobs = await db.query(
+      'jobs',
+      where: 'id = ?',
+      whereArgs: [jobId],
+    );
+    
+    if (jobs.isEmpty) {
+      return null;
+    }
+    
+    final uploaderId = jobs.first['uploaderId'];
+    
+    // Get the user by ID
+    final users = await db.query(
+      'users',
+      where: 'id = ?',
+      whereArgs: [uploaderId],
+    );
+    
+    if (users.isEmpty) {
+      return null;
+    }
+    
+    return User.fromMap(users.first);
   }
 }

@@ -212,30 +212,35 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFBFBFE),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Post a New Job',
+          'Post a Job',
           style: TextStyle(
             color: Color(0xFF050315),
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF050315)),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Form Instructions
                   Text(
-                    'Fill in the details about the job you need completed',
+                    'Enter job details',
                     style: TextStyle(
                       fontSize: 16,
                       color: const Color(0xFF050315).withOpacity(0.6),
@@ -243,339 +248,97 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                     textAlign: TextAlign.center,
                   ),
                   
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
                   
                   // Job Title field
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: TextFormField(
-                      controller: _titleController,
-                      decoration: InputDecoration(
-                        labelText: 'Job Title',
-                        prefixIcon: const Icon(
-                          Icons.work_outline,
-                          color: Color(0xFF64DFDF),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: const Color(0xFF64DFDF).withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF06D6A0),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a job title';
-                        }
-                        return null;
-                      },
-                    ),
+                  _buildTextField(
+                    controller: _titleController,
+                    label: 'Job Title',
+                    icon: Icons.work_outline,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a job title';
+                      }
+                      return null;
+                    },
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   
                   // Description field
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: TextFormField(
-                      controller: _descriptionController,
-                      maxLines: 4,
-                      decoration: InputDecoration(
-                        labelText: 'Job Description',
-                        alignLabelWithHint: true,
-                        prefixIcon: const Padding(
-                          padding: EdgeInsets.only(bottom: 64),
-                          child: Icon(
-                            Icons.description_outlined,
-                            color: Color(0xFF64DFDF),
-                          ),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: const Color(0xFF64DFDF).withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF06D6A0),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a job description';
-                        }
-                        return null;
-                      },
-                    ),
+                  _buildTextField(
+                    controller: _descriptionController,
+                    label: 'Job Description',
+                    icon: Icons.description_outlined,
+                    maxLines: 4,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a job description';
+                      }
+                      return null;
+                    },
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   
                   // Budget field
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: TextFormField(
-                      controller: _budgetController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: 'Budget (\$)',
-                        prefixIcon: const Icon(
-                          Icons.attach_money,
-                          color: Color(0xFF64DFDF),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: const Color(0xFF64DFDF).withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF06D6A0),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your budget';
-                        }
-                        if (double.tryParse(value) == null) {
-                          return 'Please enter a valid amount';
-                        }
-                        return null;
-                      },
-                    ),
+                  _buildTextField(
+                    controller: _budgetController,
+                    label: 'Budget (₱)',
+                    icon: Icons.attach_money,
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter your budget';
+                      }
+                      if (double.tryParse(value) == null) {
+                        return 'Please enter a valid amount';
+                      }
+                      return null;
+                    },
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   
                   // Location field
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: TextFormField(
-                      controller: _locationController,
-                      decoration: InputDecoration(
-                        labelText: 'Location',
-                        prefixIcon: const Icon(
-                          Icons.location_on_outlined,
-                          color: Color(0xFF64DFDF),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: const Color(0xFF64DFDF).withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF06D6A0),
-                            width: 2,
-                          ),
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a location';
-                        }
-                        return null;
-                      },
-                    ),
+                  _buildTextField(
+                    controller: _locationController,
+                    label: 'Location',
+                    icon: Icons.location_on_outlined,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a location';
+                      }
+                      return null;
+                    },
                   ),
                   
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   
                   // Date and Time Selection
                   Row(
                     children: [
                       // Date picker
                       Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: InkWell(
-                            onTap: () => _selectDate(context),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.calendar_today,
-                                    color: Color(0xFF64DFDF),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    _selectedDate == null
-                                        ? 'Select Date'
-                                        : DateFormat('MMM dd, yyyy').format(_selectedDate!),
-                                    style: TextStyle(
-                                      color: _selectedDate == null
-                                          ? const Color(0xFF050315).withOpacity(0.5)
-                                          : const Color(0xFF050315),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        child: _buildSelectionField(
+                          label: _selectedDate == null
+                              ? 'Select Date'
+                              : DateFormat('MMM dd, yyyy').format(_selectedDate!),
+                          icon: Icons.calendar_today,
+                          onTap: () => _selectDate(context),
                         ),
                       ),
                       
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       
                       // Time picker
                       Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: InkWell(
-                            onTap: () => _selectTime(context),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.access_time,
-                                    color: Color(0xFF64DFDF),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    _selectedTime == null
-                                        ? 'Select Time'
-                                        : _selectedTime!.format(context),
-                                    style: TextStyle(
-                                      color: _selectedTime == null
-                                          ? const Color(0xFF050315).withOpacity(0.5)
-                                          : const Color(0xFF050315),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        child: _buildSelectionField(
+                          label: _selectedTime == null
+                              ? 'Select Time'
+                              : _selectedTime!.format(context),
+                          icon: Icons.access_time,
+                          onTap: () => _selectTime(context),
                         ),
                       ),
                     ],
@@ -587,89 +350,47 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      border: Border.all(color: Colors.grey[200]!),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Add Photos (Optional)',
+                          'Add Photos',
                           style: TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w500,
                             color: Color(0xFF050315),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Upload images of the job (e.g., leaking pipe, garden area)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: const Color(0xFF050315).withOpacity(0.6),
-                          ),
-                        ),
                         const SizedBox(height: 16),
+                        
+                        // Image selection buttons
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
-                            // Choose from gallery
-                            ElevatedButton.icon(
-                              onPressed: _pickImages,
-                              icon: const Icon(Icons.photo_library),
-                              label: const Text('Gallery'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF64DFDF),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                            Expanded(
+                              child: _buildIconButton(
+                                label: 'Gallery',
+                                icon: Icons.photo_library,
+                                onPressed: _pickImages,
                               ),
                             ),
-                            
-                            // Take a picture
-                            ElevatedButton.icon(
-                              onPressed: _takePicture,
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('Camera'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF64DFDF),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildIconButton(
+                                label: 'Camera',
+                                icon: Icons.camera_alt,
+                                onPressed: _takePicture,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
                         
                         // Image preview
                         if (_selectedImages.isNotEmpty) ...[
-                          const Text(
-                            'Selected Images:',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF050315),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 16),
                           SizedBox(
                             height: 100,
                             child: ListView.builder(
@@ -680,32 +401,30 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                                   padding: const EdgeInsets.only(right: 8),
                                   child: Stack(
                                     children: [
-                                      Container(
-                                        width: 100,
-                                        height: 100,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(8),
-                                          image: DecorationImage(
-                                            image: FileImage(_selectedImages[index]),
-                                            fit: BoxFit.cover,
-                                          ),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Image.file(
+                                          _selectedImages[index],
+                                          width: 100,
+                                          height: 100,
+                                          fit: BoxFit.cover,
                                         ),
                                       ),
                                       Positioned(
                                         top: 4,
                                         right: 4,
-                                        child: InkWell(
+                                        child: GestureDetector(
                                           onTap: () => _removeImage(index),
                                           child: Container(
                                             padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.red.withOpacity(0.7),
+                                            decoration: const BoxDecoration(
+                                              color: Colors.black54,
                                               shape: BoxShape.circle,
                                             ),
                                             child: const Icon(
                                               Icons.close,
                                               color: Colors.white,
-                                              size: 16,
+                                              size: 14,
                                             ),
                                           ),
                                         ),
@@ -721,7 +440,7 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                     ),
                   ),
                   
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 32),
                   
                   // Submit button
                   ElevatedButton(
@@ -733,8 +452,7 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      elevation: 2,
-                      shadowColor: const Color(0xFF06D6A0).withOpacity(0.5),
+                      elevation: 0,
                       disabledBackgroundColor: const Color(0xFF06D6A0).withOpacity(0.5),
                     ),
                     child: _isSubmitting
@@ -748,13 +466,111 @@ class _JobPostingScreenState extends State<JobPostingScreen> {
                           )
                         : const Text(
                             'Post Job',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                           ),
                   ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // Helper methods for building consistent UI components
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    required String? Function(String?) validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon, color: const Color(0xFF64DFDF)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF06D6A0), width: 1.5),
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
+  Widget _buildSelectionField({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 15,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey[300]!),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF64DFDF), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: label.startsWith('Select') 
+                      ? Colors.grey[600]
+                      : Colors.black87,
+                  fontSize: 15,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIconButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 18),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: const Color(0xFF06D6A0),
+        side: const BorderSide(color: Color(0xFF06D6A0)),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
       ),
     );
