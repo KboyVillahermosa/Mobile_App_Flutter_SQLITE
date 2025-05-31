@@ -1696,9 +1696,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.white,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 5,
-                          offset: Offset(0, -3),
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, -2),
                         ),
                       ],
                     ),
@@ -2708,6 +2708,49 @@ class _HomeScreenState extends State<HomeScreen> {
               runSpacing: 8, // vertical space between rows
               alignment: WrapAlignment.end,
               children: [
+                // Add this condition to check if the notification status is "hired"
+                if (notification['status'] == 'hired')
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.check_circle_outline, size: 18),
+                    label: Text('Mark Completed', style: TextStyle(fontSize: 13)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    ),
+                    onPressed: () async {
+                      // Show confirmation dialog
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text('Complete Job'),
+                          content: Text('Are you sure this job is completed? This will notify both parties to rate each other.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: Text('Confirm'),
+                            ),
+                          ],
+                        ),
+                      );
+                      
+                      if (confirm == true) {
+                        // Mark job as completed
+                        await DatabaseHelper().markJobAsCompleted(notification['jobId']);
+                        
+                        // Refresh notifications
+                        setState(() {});
+                        
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Job marked as completed. You can now rate each other.'))
+                        );
+                      }
+                    },
+                  ),
                 if (assessmentDetails != null && 
                     (assessmentDetails['resumePath'] != null || assessmentDetails['bioDataImagePath'] != null))
                   TextButton.icon(

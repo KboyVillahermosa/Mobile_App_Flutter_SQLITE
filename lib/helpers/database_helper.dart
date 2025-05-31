@@ -27,7 +27,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       path,
-      version: 8, // Increment version to trigger migration
+      version: 9, // Increment version from 8 to 9
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -96,6 +96,22 @@ class DatabaseHelper {
         details TEXT,
         createdAt TEXT NOT NULL,
         isRead INTEGER DEFAULT 0
+      )
+    ''');
+
+    // Create ratings table
+    await db.execute('''
+      CREATE TABLE ratings(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        jobId INTEGER NOT NULL,
+        raterId INTEGER NOT NULL,
+        ratedId INTEGER NOT NULL,
+        rating INTEGER NOT NULL,
+        comment TEXT,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (jobId) REFERENCES jobs (id),
+        FOREIGN KEY (raterId) REFERENCES users (id),
+        FOREIGN KEY (ratedId) REFERENCES users (id)
       )
     ''');
   }
@@ -198,6 +214,28 @@ class DatabaseHelper {
         print('Added category column to jobs table');
       } catch (e) {
         print('Error adding category column (may already exist): $e');
+      }
+    }
+
+    if (oldVersion < 9) {
+      try {
+        await db.execute('''
+          CREATE TABLE ratings(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            jobId INTEGER NOT NULL,
+            raterId INTEGER NOT NULL,
+            ratedId INTEGER NOT NULL,
+            rating INTEGER NOT NULL,
+            comment TEXT,
+            createdAt TEXT NOT NULL,
+            FOREIGN KEY (jobId) REFERENCES jobs (id),
+            FOREIGN KEY (raterId) REFERENCES users (id),
+            FOREIGN KEY (ratedId) REFERENCES users (id)
+          )
+        ''');
+        print('Created ratings table');
+      } catch (e) {
+        print('Error creating ratings table: $e');
       }
     }
   }
@@ -942,5 +980,176 @@ class DatabaseHelper {
     }
     
     return User.fromMap(users.first);
+  }
+
+  // Add a new rating
+  Future<int> addRating(int jobId, int raterId, int ratedId, int rating, String? comment) async {
+    final db = await database;
+    
+    // Check if this user has already rated for this job
+    final existingRating = await db.query(
+      'ratings',
+      where: 'jobId = ? AND raterId = ? AND ratedId = ?',
+      whereArgs: [jobId, raterId, ratedId],
+    );
+    
+    if (existingRating.isNotEmpty) {
+      // Update existing rating
+      return await db.update(
+        'ratings',
+        {
+          'rating': rating,
+          'comment': comment,
+          'createdAt': DateTime.now().toIso8601String(),
+        },
+        where: 'id = ?',
+        whereArgs: [existingRating.first['id']],
+      );
+    } else {
+      // Create new rating
+      return await db.insert(
+        'ratings',
+        {
+          'jobId': jobId,
+          'raterId': raterId,
+          'ratedId': ratedId,
+          'rating': rating,
+          'comment': comment,
+          'createdAt': DateTime.now().toIso8601String(),
+        },
+      );
+    }
+  }
+
+  // Check if user can rate (if they haven't rated yet)
+  Future<bool> canRateUser(int jobId, int raterId, int ratedId) async {
+    final db = await database;
+    
+    // First check if the job is completed
+    final job = await getJobById(jobId);
+    if (job == null || job.status != 'completed') {
+      return false;
+    }
+    
+    // Check if rating already exists
+    final existingRating = await db.query(
+      'ratings',
+      where: 'jobId = ? AND raterId = ? AND ratedId = ?',
+      whereArgs: [jobId, raterId, ratedId],
+    );
+    
+    return existingRating.isEmpty;
+  }
+
+  // Get ratings received by a user
+  Future<List<Map<String, dynamic>>> getUserRatings(int userId) async {
+    final db = await database;
+    
+    return await db.rawQuery('''
+      SELECT 
+        r.*,
+        u.fullName as raterName,
+        u.profileImage as raterImage,
+        j.title as jobTitle
+      FROM ratings r
+      JOIN users u ON r.raterId = u.id
+      JOIN jobs j ON r.jobId = j.id
+      WHERE r.ratedId = ?
+      ORDER BY r.createdAt DESC
+    ''', [userId]);
+  }
+
+  // Get average rating for a user
+  Future<double> getUserAverageRating(int userId) async {
+    final db = await database;
+    
+    final result = await db.rawQuery('''
+      SELECT AVG(rating) as average
+      FROM ratings
+      WHERE ratedId = ?
+    ''', [userId]);
+    
+    if (result.first['average'] == null) {
+      return 0.0;
+    }
+    
+    return (result.first['average'] as num).toDouble();
+  }
+
+  // Get jobs that can be rated by a user
+  Future<List<Map<String, dynamic>>> getRatableJobs(int userId) async {
+    final db = await database;
+    
+    // Find completed jobs where the user was either the owner or the hired applicant
+    return await db.rawQuery('''
+      SELECT 
+        j.id as jobId,
+        j.title,
+        j.userId as ownerId,
+        a.applicantId as workerId,
+        u1.fullName as ownerName,
+        u2.fullName as workerName,
+        CASE WHEN j.userId = ? THEN a.applicantId ELSE j.userId END as ratedId
+      FROM jobs j
+      JOIN applications a ON j.id = a.jobId
+      JOIN users u1 ON j.userId = u1.id
+      JOIN users u2 ON a.applicantId = u2.id
+      WHERE j.status = 'completed'
+      AND a.status = 'accepted'
+      AND (j.userId = ? OR a.applicantId = ?)
+      AND NOT EXISTS (
+        SELECT 1 FROM ratings r 
+        WHERE r.jobId = j.id 
+        AND r.raterId = ? 
+        AND r.ratedId = CASE WHEN j.userId = ? THEN a.applicantId ELSE j.userId END
+      )
+    ''', [userId, userId, userId, userId, userId]);
+  }
+
+  Future<int> markJobAsCompleted(int jobId) async {
+    final db = await database;
+    
+    // Update job status
+    final result = await db.update(
+      'jobs',
+      {'status': 'completed'},
+      where: 'id = ?',
+      whereArgs: [jobId],
+    );
+    
+    // Create notifications for both employer and worker
+    if (result > 0) {
+      final job = await getJobById(jobId);
+      if (job != null) {
+        final applications = await db.query(
+          'applications',
+          where: 'jobId = ? AND status = ?',
+          whereArgs: [jobId, 'accepted'],
+        );
+        
+        if (applications.isNotEmpty) {
+          final applicantId = applications.first['applicantId'] as int;
+          
+          // Notify both parties that they can now rate each other
+          await createNotification(
+            job.userId,  // Notify employer
+            applicantId,
+            'job_completed',
+            'Your job "${job.title}" is completed. You can now rate the worker.',
+            jsonEncode({'jobId': jobId, 'ratedId': applicantId}),
+          );
+          
+          await createNotification(
+            applicantId,  // Notify worker
+            job.userId,
+            'job_completed',
+            'Job "${job.title}" is marked as completed. You can now rate the employer.',
+            jsonEncode({'jobId': jobId, 'ratedId': job.userId}),
+          );
+        }
+      }
+    }
+    
+    return result;
   }
 }
